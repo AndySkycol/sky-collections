@@ -6,7 +6,7 @@ Desktop.ini
 .DS_Store
 node_modules/
 .pnpm-store/
-tarjetas/
+/tarjetas/
 tarjetas-*.jpg
 tarjetas-*.png
 tarjetas_*.py

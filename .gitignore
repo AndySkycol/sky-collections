@@ -1,0 +1,6 @@
+# Archivos del sistema
+Thumbs.db
+Desktop.ini
+
+# Archivos de trabajo locales
+.DS_Store

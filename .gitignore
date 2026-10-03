@@ -4,3 +4,10 @@ Desktop.ini
 
 # Archivos de trabajo locales
 .DS_Store
+node_modules/
+tarjetas/
+tarjetas-*.jpg
+tarjetas-*.png
+tarjetas_*.py
+productos/WhatsApp Image 2026-10-02 at 10.30.12 PM.jpeg
+productos/WhatsApp Image 2026-10-02 at 10.31.23 PM.jpeg

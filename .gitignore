@@ -5,6 +5,7 @@ Desktop.ini
 # Archivos de trabajo locales
 .DS_Store
 node_modules/
+.pnpm-store/
 tarjetas/
 tarjetas-*.jpg
 tarjetas-*.png

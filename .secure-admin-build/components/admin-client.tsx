@@ -1,0 +1,292 @@
+"use client";
+
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import type { BreakItem, CatalogSnapshot, Product } from "../lib/catalog-types";
+
+declare global {
+  interface Window {
+    SKY_DEFAULT_PRODUCTS?: Product[];
+    SKY_DEFAULT_BREAKS?: BreakItem[];
+  }
+}
+
+type Props = { email: string; displayName: string; signOutPath: string };
+type Editor = { kind: "product" | "break"; index?: number } | null;
+
+const money = new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
+const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
+const nowLabel = (value?: string | null) => value ? new Date(value).toLocaleString("es-CO") : "Aún no";
+
+function defaultSnapshot(): CatalogSnapshot {
+  return {
+    products: clone(window.SKY_DEFAULT_PRODUCTS ?? []),
+    breaks: clone(window.SKY_DEFAULT_BREAKS ?? []),
+  };
+}
+
+function parsePriceOptions(value: string) {
+  return value.split(/[\n;]/).map((line) => {
+    const [spotsText, ...priceParts] = line.split(/[:=]/);
+    return {
+      spots: Number((spotsText ?? "").replace(/\D/g, "")),
+      price: Number(priceParts.join("").replace(/\D/g, "")),
+    };
+  }).filter((option) => option.spots > 0 && option.price >= 0);
+}
+
+function optionsText(item: BreakItem) {
+  return (item.priceOptions ?? []).map((option) => `${option.spots}: ${option.price}`).join("\n");
+}
+
+export function AdminClient({ email, displayName, signOutPath }: Props) {
+  const [data, setData] = useState<CatalogSnapshot>({ products: [], breaks: [] });
+  const [view, setView] = useState<"products" | "breaks">("products");
+  const [filter, setFilter] = useState<"boxes" | "cards" | "all">("boxes");
+  const [editor, setEditor] = useState<Editor>(null);
+  const [productDraft, setProductDraft] = useState<Product>({ name: "", detail: "", price: 0, stock: 1, image: "", category: "Producto sellado" });
+  const [breakDraft, setBreakDraft] = useState<BreakItem>({ id: "", title: "", description: "", image: "", priceOptions: [], spotsTotal: 32, spotsAvailable: 32, status: "active" });
+  const [optionsDraft, setOptionsDraft] = useState("");
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [working, setWorking] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const [savedAt, setSavedAt] = useState<string | null>(null);
+  const [publishedAt, setPublishedAt] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const response = await fetch("/api/admin/snapshot", { cache: "no-store" });
+        if (!response.ok) throw new Error((await response.json()).error || "No se pudo cargar el panel.");
+        const result = await response.json();
+        if (result.draft?.data) {
+          setData(result.draft.data);
+          setSavedAt(result.draft.updatedAt);
+          setPublishedAt(result.published?.updatedAt ?? null);
+        } else {
+          const initial = defaultSnapshot();
+          setData(initial);
+          const saved = await saveSnapshot(initial);
+          setSavedAt(saved.updatedAt);
+          const published = await publishSnapshot();
+          setPublishedAt(published.publishedAt);
+          setMessage("El catálogo actual quedó conectado al panel.");
+        }
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "No se pudo cargar el panel.");
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, []);
+
+  const visibleProducts = useMemo(() => data.products.filter((product) => {
+    if (filter === "all") return true;
+    const isCard = product.category === "Tarjetas";
+    return filter === "cards" ? isCard : !isCard;
+  }), [data.products, filter]);
+
+  async function saveSnapshot(snapshot: CatalogSnapshot) {
+    const response = await fetch("/api/admin/snapshot", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(snapshot),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || "No se pudo guardar.");
+    return result;
+  }
+
+  async function publishSnapshot() {
+    const response = await fetch("/api/admin/publish", { method: "POST" });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || "No se pudo publicar.");
+    return result;
+  }
+
+  function changeData(next: CatalogSnapshot) {
+    setData(next);
+    setDirty(true);
+    setMessage(null);
+    setError(null);
+  }
+
+  async function handleSave() {
+    setWorking(true); setError(null); setMessage(null);
+    try {
+      const result = await saveSnapshot(data);
+      setSavedAt(result.updatedAt);
+      setDirty(false);
+      setMessage("Borrador guardado. La página pública todavía no cambió.");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "No se pudo guardar.");
+    } finally { setWorking(false); }
+  }
+
+  async function handlePublish() {
+    setWorking(true); setError(null); setMessage(null);
+    try {
+      const saved = await saveSnapshot(data);
+      setSavedAt(saved.updatedAt);
+      const published = await publishSnapshot();
+      setPublishedAt(published.publishedAt);
+      setDirty(false);
+      setMessage("Cambios publicados. Ya están visibles en la página.");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "No se pudo publicar.");
+    } finally { setWorking(false); }
+  }
+
+  function adjustStock(index: number, amount: number) {
+    const products = clone(data.products);
+    products[index].stock = Math.max(0, Number(products[index].stock || 0) + amount);
+    changeData({ ...data, products });
+  }
+
+  function openProduct(index?: number) {
+    setProductDraft(index === undefined
+      ? { name: "", detail: "", price: 0, stock: 1, image: "", category: "Producto sellado" }
+      : clone(data.products[index]));
+    setImageFile(null);
+    setEditor({ kind: "product", index });
+  }
+
+  function openBreak(index?: number) {
+    const item = index === undefined
+      ? { id: `break-${Date.now()}`, title: "", description: "", image: "assets/break-merlin.jpeg", priceOptions: [], spotsTotal: 32, spotsAvailable: 32, status: "active" as const, published: Date.now() }
+      : clone(data.breaks[index]);
+    setBreakDraft(item);
+    setOptionsDraft(optionsText(item));
+    setImageFile(null);
+    setEditor({ kind: "break", index });
+  }
+
+  async function uploadImage(file: File | null) {
+    if (!file) return null;
+    const form = new FormData();
+    form.set("file", file);
+    const response = await fetch("/api/admin/upload", { method: "POST", body: form });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || "No se pudo subir la imagen.");
+    return result.url as string;
+  }
+
+  async function submitEditor(event: FormEvent) {
+    event.preventDefault();
+    if (!editor) return;
+    setWorking(true); setError(null);
+    try {
+      const uploaded = await uploadImage(imageFile);
+      if (editor.kind === "product") {
+        const products = clone(data.products);
+        const item = { ...productDraft, image: uploaded || productDraft.image || "assets/logo.jpeg", price: Number(productDraft.price), stock: Math.max(0, Number(productDraft.stock)), published: productDraft.published ?? Date.now() };
+        if (editor.index === undefined) products.push(item); else products[editor.index] = item;
+        changeData({ ...data, products });
+      } else {
+        const breaks = clone(data.breaks);
+        const total = Math.max(0, Number(breakDraft.spotsTotal));
+        const item = { ...breakDraft, image: uploaded || breakDraft.image || "assets/break-merlin.jpeg", priceOptions: parsePriceOptions(optionsDraft), spotsTotal: total, spotsAvailable: Math.min(total, Math.max(0, Number(breakDraft.spotsAvailable))), published: breakDraft.published ?? Date.now() };
+        if (editor.index === undefined) breaks.push(item); else breaks[editor.index] = item;
+        changeData({ ...data, breaks });
+      }
+      setEditor(null);
+      setMessage("Cambio preparado. Guarda el borrador o publícalo cuando termines.");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "No se pudo guardar el cambio.");
+    } finally { setWorking(false); }
+  }
+
+  function removeProduct(index: number) {
+    if (!confirm("¿Quitar este producto del catálogo?")) return;
+    const products = data.products.filter((_, itemIndex) => itemIndex !== index);
+    changeData({ ...data, products });
+  }
+
+  function removeBreak(index: number) {
+    if (!confirm("¿Quitar este break?")) return;
+    const breaks = data.breaks.filter((_, itemIndex) => itemIndex !== index);
+    changeData({ ...data, breaks });
+  }
+
+  if (loading) return <main className="admin-page"><div className="admin-wrap admin-panel">Cargando panel…</div></main>;
+
+  return (
+    <main className="admin-page">
+      <div className="admin-wrap">
+        <header className="admin-top">
+          <div className="admin-brand"><img src="/assets/logo.jpeg" alt="" /><div><strong>Sky Collections</strong><span>Administración del catálogo</span></div></div>
+          <div className="admin-user"><strong>{displayName}</strong><br />{email}<br /><a href={signOutPath}>Cerrar sesión</a></div>
+        </header>
+
+        <div className="admin-toolbar">
+          <div className="admin-status"><strong>{dirty ? "Hay cambios sin guardar" : "Borrador al día"}</strong><br />Guardado: {nowLabel(savedAt)} · Publicado: {nowLabel(publishedAt)}</div>
+          <div className="admin-actions">
+            <button className="admin-button" onClick={handleSave} disabled={working}>Guardar borrador</button>
+            <button className="admin-button primary" onClick={handlePublish} disabled={working}>Publicar cambios</button>
+            <a className="admin-button blue" href="/" target="_blank" rel="noreferrer" style={{display:"inline-grid",placeItems:"center"}}>Ver página</a>
+          </div>
+        </div>
+
+        {message && <p className="admin-alert">{message}</p>}
+        {error && <p className="admin-alert error">{error}</p>}
+
+        <nav className="admin-tabs" aria-label="Secciones">
+          <button className={`admin-button ${view === "products" ? "active" : ""}`} onClick={() => setView("products")}>Cajas y tarjetas</button>
+          <button className={`admin-button ${view === "breaks" ? "active" : ""}`} onClick={() => setView("breaks")}>Breaks</button>
+        </nav>
+
+        {view === "products" ? (
+          <section className="admin-panel">
+            <div className="admin-panel-head"><div><h1>Inventario</h1><p>Agrega, edita, quita productos y actualiza las unidades disponibles.</p></div><button className="admin-button primary" onClick={() => openProduct()}>+ Agregar producto</button></div>
+            <div className="admin-filter">
+              {(["boxes", "cards", "all"] as const).map((value) => <button key={value} className={`admin-button ${filter === value ? "active" : ""}`} onClick={() => setFilter(value)}>{value === "boxes" ? "Cajas" : value === "cards" ? "Tarjetas" : "Todos"}</button>)}
+            </div>
+            <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Foto</th><th>Producto</th><th>Tipo</th><th>Precio</th><th>Inventario</th><th>Acciones</th></tr></thead><tbody>
+              {visibleProducts.map((product) => {
+                const index = data.products.indexOf(product);
+                return <tr key={`${product.name}-${index}`}><td><img className="admin-thumb" src={product.image} alt="" /></td><td><strong>{product.name}</strong><br /><small>{product.detail || product.category}</small></td><td>{product.category}</td><td>{money.format(Number(product.price) || 0)}</td><td><div className="admin-stock"><button onClick={() => adjustStock(index, -1)}>−</button><strong className={product.stock === 0 ? "admin-stock-zero" : ""}>{product.stock}</strong><button onClick={() => adjustStock(index, 1)}>+</button></div></td><td><div className="admin-row-actions"><button className="admin-link" onClick={() => openProduct(index)}>Editar</button><button className="admin-link" onClick={() => removeProduct(index)}>Quitar</button></div></td></tr>;
+              })}
+              {!visibleProducts.length && <tr><td colSpan={6}><div className="admin-empty">No hay productos en esta categoría.</div></td></tr>}
+            </tbody></table></div>
+          </section>
+        ) : (
+          <section className="admin-panel">
+            <div className="admin-panel-head"><div><h1>Breaks</h1><p>Muestra varios breaks vigentes y pasa los finalizados al historial.</p></div><button className="admin-button primary" onClick={() => openBreak()}>+ Crear break</button></div>
+            <div className="admin-break-list">
+              {data.breaks.map((item, index) => <article className="admin-break-row" key={item.id}><img src={item.image} alt="" /><div><h3>{item.title}</h3><p>{item.status === "past" ? `Terminado · ${item.spotsTotal} cupos` : `${item.spotsAvailable} cupos libres de ${item.spotsTotal}`} · {(item.priceOptions ?? []).map((option) => `${option.spots} spot${option.spots === 1 ? "" : "s"} ${money.format(option.price)}`).join(" · ")}</p><span className={`admin-pill ${item.status === "past" ? "past" : ""}`}>{item.status === "past" ? "Terminado" : "Vigente"}</span></div><div className="admin-row-actions"><button className="admin-link" onClick={() => openBreak(index)}>Editar</button><button className="admin-link" onClick={() => removeBreak(index)}>Quitar</button></div></article>)}
+              {!data.breaks.length && <div className="admin-empty">Aún no hay breaks.</div>}
+            </div>
+          </section>
+        )}
+      </div>
+
+      {editor && <div className="admin-modal" role="dialog" aria-modal="true"><form className="admin-modal-card" onSubmit={submitEditor}>
+        <div className="admin-modal-head"><h2>{editor.kind === "product" ? (editor.index === undefined ? "Agregar producto" : "Editar producto") : (editor.index === undefined ? "Crear break" : "Editar break")}</h2><button className="admin-close" type="button" onClick={() => setEditor(null)}>×</button></div>
+        {editor.kind === "product" ? <div className="admin-form-grid">
+          <div className="admin-field"><label>Tipo</label><select value={productDraft.category} onChange={(event) => setProductDraft({...productDraft, category:event.target.value})}><option value="Producto sellado">Caja / producto sellado</option><option value="Tarjetas">Tarjeta</option><option value="Hobby box">Hobby box</option><option value="Sobres">Sobre</option></select></div>
+          <div className="admin-field"><label>Inventario</label><input type="number" min="0" required value={productDraft.stock} onChange={(event) => setProductDraft({...productDraft, stock:Number(event.target.value)})} /></div>
+          <div className="admin-field full"><label>Nombre del jugador o producto</label><input required value={productDraft.name} onChange={(event) => setProductDraft({...productDraft, name:event.target.value})} /></div>
+          <div className="admin-field full"><label>Colección, tipo o variante</label><input value={productDraft.detail ?? ""} onChange={(event) => setProductDraft({...productDraft, detail:event.target.value})} placeholder="Ej. Panini Select · Patch /25" /></div>
+          <div className="admin-field"><label>Precio (COP)</label><input type="number" min="0" required value={productDraft.price} onChange={(event) => setProductDraft({...productDraft, price:Number(event.target.value)})} /></div>
+          <div className="admin-field"><label>Imagen actual</label><input value={productDraft.image} onChange={(event) => setProductDraft({...productDraft, image:event.target.value})} placeholder="URL o ruta" /></div>
+          <div className="admin-field full"><label>Subir una foto nueva</label><input type="file" accept="image/*" onChange={(event) => setImageFile(event.target.files?.[0] ?? null)} /><small>JPG, PNG o WEBP, máximo 10 MB.</small></div>
+          {productDraft.image && <div className="admin-field full"><img className="admin-preview" src={productDraft.image} alt="Vista previa" /></div>}
+        </div> : <div className="admin-form-grid">
+          <div className="admin-field full"><label>Nombre del break</label><input required value={breakDraft.title} onChange={(event) => setBreakDraft({...breakDraft, title:event.target.value})} /></div>
+          <div className="admin-field full"><label>Descripción</label><textarea required value={breakDraft.description} onChange={(event) => setBreakDraft({...breakDraft, description:event.target.value})} /></div>
+          <div className="admin-field"><label>Estado</label><select value={breakDraft.status} onChange={(event) => setBreakDraft({...breakDraft, status:event.target.value as "active" | "past"})}><option value="active">Vigente</option><option value="past">Terminado</option></select></div>
+          <div className="admin-field"><label>Imagen actual</label><input value={breakDraft.image} onChange={(event) => setBreakDraft({...breakDraft, image:event.target.value})} /></div>
+          <div className="admin-field full"><label>Subir una foto nueva</label><input type="file" accept="image/*" onChange={(event) => setImageFile(event.target.files?.[0] ?? null)} /></div>
+          <div className="admin-field full"><label>Opciones de reserva y precio (COP)</label><textarea value={optionsDraft} onChange={(event) => setOptionsDraft(event.target.value)} placeholder={"1: 50000\n2: 90000\n5: 200000"} /><small>Una opción por línea: cantidad de spots: precio. Puedes poner una sola opción o todas las que necesites.</small></div>
+          <div className="admin-field"><label>Cupos totales</label><input type="number" min="0" required value={breakDraft.spotsTotal} onChange={(event) => setBreakDraft({...breakDraft, spotsTotal:Number(event.target.value)})} /></div>
+          <div className="admin-field"><label>Cupos libres</label><input type="number" min="0" required value={breakDraft.spotsAvailable} onChange={(event) => setBreakDraft({...breakDraft, spotsAvailable:Number(event.target.value)})} /></div>
+          {breakDraft.image && <div className="admin-field full"><img className="admin-preview" src={breakDraft.image} alt="Vista previa" /></div>}
+        </div>}
+        <div className="admin-modal-actions"><button className="admin-button" type="button" onClick={() => setEditor(null)}>Cancelar</button><button className="admin-button primary" type="submit" disabled={working}>Aplicar al borrador</button></div>
+      </form></div>}
+    </main>
+  );
+}

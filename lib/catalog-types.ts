@@ -7,6 +7,11 @@ export type Product = {
   image: string;
   category: string;
   published?: number;
+  country?: string;
+  team?: string;
+  numbered?: boolean;
+  patch?: boolean;
+  signature?: boolean;
 };
 
 export type PriceOption = { spots: number; price: number };

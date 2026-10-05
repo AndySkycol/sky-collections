@@ -193,6 +193,9 @@ html, body { min-height: 100%; }
 .admin-field input, .admin-field select, .admin-field textarea { width: 100%; min-height: 44px; padding: 9px 11px; border: 1px solid rgb(9 45 82 / 20%); border-radius: 10px; color: #102a43; background: white; }
 .admin-field textarea { min-height: 92px; resize: vertical; }
 .admin-field small { color: #51677c; }
+.admin-checks { display: flex; flex-wrap: wrap; gap: 10px 18px; padding: 12px; border: 1px solid rgb(9 45 82 / 14%); border-radius: 10px; background: #fffdf7; }
+.admin-checks label { display: inline-flex; align-items: center; gap: 7px; color: #102a43; font-size: .92rem; font-weight: 700; }
+.admin-checks input { width: 17px; height: 17px; accent-color: #125f91; }
 .admin-preview { width: 100%; max-height: 190px; object-fit: contain; border-radius: 12px; background: #e9dfca; }
 .admin-modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
 .admin-alert { margin: 16px 0; padding: 12px 15px; border-left: 4px solid #f4c964; border-radius: 9px; background: #fff8e8; }

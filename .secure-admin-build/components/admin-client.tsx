@@ -7,6 +7,7 @@ declare global {
   interface Window {
     SKY_DEFAULT_PRODUCTS?: Product[];
     SKY_DEFAULT_BREAKS?: BreakItem[];
+    SKY_CARD_METADATA?: Record<string, Partial<Product>>;
   }
 }
 
@@ -16,12 +17,22 @@ type Editor = { kind: "product" | "break"; index?: number } | null;
 const money = new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
 const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
 const nowLabel = (value?: string | null) => value ? new Date(value).toLocaleString("es-CO") : "Aún no";
+const countryOptions = ["Argentina", "Brasil", "Colombia", "España", "Francia", "Inglaterra", "Portugal", "Alemania", "Italia", "Bélgica", "Países Bajos", "Noruega", "Uruguay", "México"];
+const teamOptions = ["Real Madrid", "FC Barcelona", "Atlético de Madrid", "Manchester City", "Manchester United", "Liverpool", "Arsenal", "Chelsea", "Bayern Munich", "Borussia Dortmund", "Paris Saint-Germain", "Juventus", "Inter de Milán", "AC Milan", "Napoli", "Tottenham Hotspur"];
+
+function hydrateSnapshot(snapshot: CatalogSnapshot): CatalogSnapshot {
+  const metadata = window.SKY_CARD_METADATA ?? {};
+  return {
+    ...snapshot,
+    products: snapshot.products.map((product) => ({ ...(metadata[product.image] ?? {}), ...product })),
+  };
+}
 
 function defaultSnapshot(): CatalogSnapshot {
-  return {
+  return hydrateSnapshot({
     products: clone(window.SKY_DEFAULT_PRODUCTS ?? []),
     breaks: clone(window.SKY_DEFAULT_BREAKS ?? []),
-  };
+  });
 }
 
 function parsePriceOptions(value: string) {
@@ -62,7 +73,7 @@ export function AdminClient({ email, displayName, signOutPath }: Props) {
         if (!response.ok) throw new Error((await response.json()).error || "No se pudo cargar el panel.");
         const result = await response.json();
         if (result.draft?.data) {
-          setData(result.draft.data);
+          setData(hydrateSnapshot(result.draft.data));
           setSavedAt(result.draft.updatedAt);
           setPublishedAt(result.published?.updatedAt ?? null);
         } else {
@@ -146,9 +157,9 @@ export function AdminClient({ email, displayName, signOutPath }: Props) {
     changeData({ ...data, products });
   }
 
-  function openProduct(index?: number) {
+  function openProduct(index?: number, category = "Producto sellado") {
     setProductDraft(index === undefined
-      ? { name: "", detail: "", price: 0, stock: 1, image: "", category: "Producto sellado" }
+      ? { name: "", detail: "", price: 0, stock: 1, image: "", category }
       : clone(data.products[index]));
     setImageFile(null);
     setEditor({ kind: "product", index });
@@ -240,7 +251,7 @@ export function AdminClient({ email, displayName, signOutPath }: Props) {
 
         {view === "products" ? (
           <section className="admin-panel">
-            <div className="admin-panel-head"><div><h1>Inventario</h1><p>Agrega, edita, quita productos y actualiza las unidades disponibles.</p></div><button className="admin-button primary" onClick={() => openProduct()}>+ Agregar producto</button></div>
+            <div className="admin-panel-head"><div><h1>Inventario</h1><p>Agrega, edita, quita productos y actualiza las unidades disponibles.</p></div><div className="admin-actions"><button className="admin-button" onClick={() => openProduct()}>+ Agregar caja</button><button className="admin-button primary" onClick={() => openProduct(undefined, "Tarjetas")}>+ Agregar tarjeta</button></div></div>
             <div className="admin-filter">
               {(["boxes", "cards", "all"] as const).map((value) => <button key={value} className={`admin-button ${filter === value ? "active" : ""}`} onClick={() => setFilter(value)}>{value === "boxes" ? "Cajas" : value === "cards" ? "Tarjetas" : "Todos"}</button>)}
             </div>
@@ -270,6 +281,11 @@ export function AdminClient({ email, displayName, signOutPath }: Props) {
           <div className="admin-field"><label>Inventario</label><input type="number" min="0" required value={productDraft.stock} onChange={(event) => setProductDraft({...productDraft, stock:Number(event.target.value)})} /></div>
           <div className="admin-field full"><label>Nombre del jugador o producto</label><input required value={productDraft.name} onChange={(event) => setProductDraft({...productDraft, name:event.target.value})} /></div>
           <div className="admin-field full"><label>Colección, tipo o variante</label><input value={productDraft.detail ?? ""} onChange={(event) => setProductDraft({...productDraft, detail:event.target.value})} placeholder="Ej. Panini Select · Patch /25" /></div>
+          {productDraft.category === "Tarjetas" && <>
+            <div className="admin-field"><label>País <small>(opcional)</small></label><select value={productDraft.country ?? ""} onChange={(event) => setProductDraft({...productDraft, country:event.target.value})}><option value="">Sin seleccionar</option>{countryOptions.map((country) => <option key={country} value={country}>{country}</option>)}</select></div>
+            <div className="admin-field"><label>Equipo <small>(opcional)</small></label><select value={productDraft.team ?? ""} onChange={(event) => setProductDraft({...productDraft, team:event.target.value})}><option value="">Sin seleccionar</option>{teamOptions.map((team) => <option key={team} value={team}>{team}</option>)}</select></div>
+            <div className="admin-field full"><label>Atributos de la tarjeta <small>(opcionales)</small></label><div className="admin-checks"><label><input type="checkbox" checked={Boolean(productDraft.numbered)} onChange={(event) => setProductDraft({...productDraft, numbered:event.target.checked})} /> Numerada</label><label><input type="checkbox" checked={Boolean(productDraft.patch)} onChange={(event) => setProductDraft({...productDraft, patch:event.target.checked})} /> Patch</label><label><input type="checkbox" checked={Boolean(productDraft.signature)} onChange={(event) => setProductDraft({...productDraft, signature:event.target.checked})} /> Firma</label></div></div>
+          </>}
           <div className="admin-field"><label>Precio (COP)</label><input type="number" min="0" required value={productDraft.price} onChange={(event) => setProductDraft({...productDraft, price:Number(event.target.value)})} /></div>
           <div className="admin-field"><label>Imagen actual</label><input value={productDraft.image} onChange={(event) => setProductDraft({...productDraft, image:event.target.value})} placeholder="URL o ruta" /></div>
           <div className="admin-field full"><label>Subir una foto nueva</label><input type="file" accept="image/*" onChange={(event) => setImageFile(event.target.files?.[0] ?? null)} /><small>JPG, PNG o WEBP, máximo 10 MB.</small></div>

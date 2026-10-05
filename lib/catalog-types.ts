@@ -31,6 +31,7 @@ export type BreakItem = {
 export type CatalogSnapshot = {
   products: Product[];
   breaks: BreakItem[];
+  finance?: import("./finance-types").FinanceData;
 };
 
 export function isCatalogSnapshot(value: unknown): value is CatalogSnapshot {

@@ -8,7 +8,8 @@ export async function GET() {
       "SELECT data, updated_at AS updatedAt FROM site_snapshots WHERE id = ?",
     ).bind("published").first<{ data: string; updatedAt: string }>();
     if (!row) return Response.json(null, { headers: { "Cache-Control": "no-store" } });
-    return Response.json(JSON.parse(row.data), {
+    const snapshot = JSON.parse(row.data);
+    return Response.json({ products: snapshot.products ?? [], breaks: snapshot.breaks ?? [] }, {
       headers: { "Cache-Control": "no-store" },
     });
   } catch {

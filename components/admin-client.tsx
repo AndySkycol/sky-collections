@@ -2,6 +2,8 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { BreakItem, CatalogSnapshot, Product } from "../lib/catalog-types";
+import type { FinanceData } from "../lib/finance-types";
+import { FinancePanel } from "./finance-panel";
 
 declare global {
   interface Window {
@@ -19,12 +21,34 @@ const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
 const nowLabel = (value?: string | null) => value ? new Date(value).toLocaleString("es-CO") : "Aún no";
 const countryOptions = ["Argentina", "Brasil", "Colombia", "España", "Francia", "Inglaterra", "Portugal", "Alemania", "Italia", "Bélgica", "Países Bajos", "Noruega", "Uruguay", "México"];
 const teamOptions = ["Real Madrid", "FC Barcelona", "Atlético de Madrid", "Manchester City", "Manchester United", "Liverpool", "Arsenal", "Chelsea", "Bayern Munich", "Borussia Dortmund", "Paris Saint-Germain", "Juventus", "Inter de Milán", "AC Milan", "Napoli", "Tottenham Hotspur"];
+const importedCustomerNames = ["Alejandro Palacios", "Alejo Yepes", "Andres Gutierrez", "Arley Alarcon", "Camilo Figueroa", "Camilo Serna", "Cardlab", "Daniela Aldana", "David Moreno", "David Valero", "Edxon Cubillos", "Esteban Pineda", "Fabian Parra", "Fabian Ramirez", "Fabio Body Soccer", "Jhohanny Ruiz", "Jhonathan Sepulveda", "Jose Cortez", "Juan Duran", "Juan Pablo Vaul", "Julian Camilo", "Luis Mercado", "Luis Venezuela", "Miguel Cabrera", "Muhtasim", "Nestor Castillo", "Rodrigo Velez", "Sara Melo", "Sebastain Mustafa", "Sebastian Duarte", "Serigo Celis", "Valdo", "William Hernandez", "Yolfre"];
+
+function defaultFinance(): FinanceData {
+  return {
+    version: 2,
+    baseline: { cutoverDate: "2026-10-05", nequi: 1852213, cash: 156000, debt: 2356037 },
+    historicalMonths: [
+      { month: "2026-08", sales: 1918000, expenses: 4490487 },
+      { month: "2026-09", sales: 5524601, expenses: 5919694 },
+      { month: "2026-10", sales: 2995500, expenses: 1262013 },
+    ],
+    customers: importedCustomerNames.map((name, index) => ({ id: `imported-customer-${index + 1}`, name, createdAt: "2026-10-05T00:00:00.000Z" })),
+    sales: [], expenses: [], shipments: [], incomingOrders: [], debtPayments: [],
+  };
+}
 
 function hydrateSnapshot(snapshot: CatalogSnapshot): CatalogSnapshot {
   const metadata = window.SKY_CARD_METADATA ?? {};
+  const finance = !snapshot.finance ? defaultFinance() : snapshot.finance.version === 2 ? snapshot.finance : {
+    ...snapshot.finance,
+    version: 2,
+    baseline: { ...snapshot.finance.baseline, nequi: snapshot.finance.baseline.nequi === 2797037 ? 1852213 : snapshot.finance.baseline.nequi },
+    historicalMonths: snapshot.finance.historicalMonths.map((item) => item.month === "2026-10" && item.expenses === 317189 ? { ...item, expenses: 1262013 } : item),
+  };
   return {
     ...snapshot,
     products: snapshot.products.map((product) => ({ ...(metadata[product.image] ?? {}), ...product })),
+    finance,
   };
 }
 
@@ -32,6 +56,7 @@ function defaultSnapshot(): CatalogSnapshot {
   return hydrateSnapshot({
     products: clone(window.SKY_DEFAULT_PRODUCTS ?? []),
     breaks: clone(window.SKY_DEFAULT_BREAKS ?? []),
+    finance: defaultFinance(),
   });
 }
 
@@ -51,7 +76,7 @@ function optionsText(item: BreakItem) {
 
 export function AdminClient({ email, displayName, signOutPath }: Props) {
   const [data, setData] = useState<CatalogSnapshot>({ products: [], breaks: [] });
-  const [view, setView] = useState<"products" | "breaks">("products");
+  const [view, setView] = useState<"products" | "breaks" | "finance">("products");
   const [filter, setFilter] = useState<"boxes" | "cards" | "all">("boxes");
   const [editor, setEditor] = useState<Editor>(null);
   const [productDraft, setProductDraft] = useState<Product>({ name: "", detail: "", price: 0, stock: 1, image: "", category: "Producto sellado" });
@@ -65,6 +90,7 @@ export function AdminClient({ email, displayName, signOutPath }: Props) {
   const [publishedAt, setPublishedAt] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [receivingOrderId, setReceivingOrderId] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -157,11 +183,12 @@ export function AdminClient({ email, displayName, signOutPath }: Props) {
     changeData({ ...data, products });
   }
 
-  function openProduct(index?: number, category = "Producto sellado") {
+  function openProduct(index?: number, category = "Producto sellado", initial?: Partial<Product>, incomingOrderId?: string) {
     setProductDraft(index === undefined
-      ? { name: "", detail: "", price: 0, stock: 1, image: "", category }
+      ? { name: "", detail: "", price: 0, stock: 1, image: "", category, ...initial }
       : clone(data.products[index]));
     setImageFile(null);
+    setReceivingOrderId(incomingOrderId ?? null);
     setEditor({ kind: "product", index });
   }
 
@@ -195,7 +222,11 @@ export function AdminClient({ email, displayName, signOutPath }: Props) {
         const products = clone(data.products);
         const item = { ...productDraft, image: uploaded || productDraft.image || "assets/logo.jpeg", price: Number(productDraft.price), stock: Math.max(0, Number(productDraft.stock)), published: productDraft.published ?? Date.now() };
         if (editor.index === undefined) products.push(item); else products[editor.index] = item;
-        changeData({ ...data, products });
+        const finance = receivingOrderId && data.finance ? {
+          ...data.finance,
+          incomingOrders: data.finance.incomingOrders.map((order) => order.id === receivingOrderId ? { ...order, status: "received" as const, receivedAt: new Date().toISOString() } : order),
+        } : data.finance;
+        changeData({ ...data, products, finance });
       } else {
         const breaks = clone(data.breaks);
         const total = Math.max(0, Number(breakDraft.spotsTotal));
@@ -203,7 +234,7 @@ export function AdminClient({ email, displayName, signOutPath }: Props) {
         if (editor.index === undefined) breaks.push(item); else breaks[editor.index] = item;
         changeData({ ...data, breaks });
       }
-      setEditor(null);
+      setEditor(null); setReceivingOrderId(null);
       setMessage("Cambio preparado. Guarda el borrador o publícalo cuando termines.");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "No se pudo guardar el cambio.");
@@ -228,7 +259,7 @@ export function AdminClient({ email, displayName, signOutPath }: Props) {
     <main className="admin-page">
       <div className="admin-wrap">
         <header className="admin-top">
-          <div className="admin-brand"><img src="/assets/logo.jpeg" alt="" /><div><strong>Sky Collections</strong><span>Administración del catálogo</span></div></div>
+          <div className="admin-brand"><img src="/assets/logo.jpeg" alt="" /><div><strong>Sky Collections</strong><span>Administración del catálogo y finanzas</span></div></div>
           <div className="admin-user"><strong>{displayName}</strong><br />{email}<br /><a href={signOutPath}>Cerrar sesión</a></div>
         </header>
 
@@ -247,6 +278,7 @@ export function AdminClient({ email, displayName, signOutPath }: Props) {
         <nav className="admin-tabs" aria-label="Secciones">
           <button className={`admin-button ${view === "products" ? "active" : ""}`} onClick={() => setView("products")}>Cajas y tarjetas</button>
           <button className={`admin-button ${view === "breaks" ? "active" : ""}`} onClick={() => setView("breaks")}>Breaks</button>
+          <button className={`admin-button ${view === "finance" ? "active" : ""}`} onClick={() => setView("finance")}>Finanzas</button>
         </nav>
 
         {view === "products" ? (
@@ -263,7 +295,7 @@ export function AdminClient({ email, displayName, signOutPath }: Props) {
               {!visibleProducts.length && <tr><td colSpan={6}><div className="admin-empty">No hay productos en esta categoría.</div></td></tr>}
             </tbody></table></div>
           </section>
-        ) : (
+        ) : view === "breaks" ? (
           <section className="admin-panel">
             <div className="admin-panel-head"><div><h1>Breaks</h1><p>Muestra varios breaks vigentes y pasa los finalizados al historial.</p></div><button className="admin-button primary" onClick={() => openBreak()}>+ Crear break</button></div>
             <div className="admin-break-list">
@@ -271,11 +303,24 @@ export function AdminClient({ email, displayName, signOutPath }: Props) {
               {!data.breaks.length && <div className="admin-empty">Aún no hay breaks.</div>}
             </div>
           </section>
-        )}
+        ) : data.finance && <FinancePanel
+          data={data.finance}
+          products={data.products}
+          onChange={(finance, products = data.products) => changeData({ ...data, finance, products })}
+          onReceiveIncoming={(order, existingProductIndex) => {
+            if (existingProductIndex !== undefined) {
+              const products = clone(data.products);
+              products[existingProductIndex].stock = Number(products[existingProductIndex].stock || 0) + order.expectedQuantity;
+              changeData({ ...data, products, finance: { ...data.finance, incomingOrders: data.finance.incomingOrders.map((item) => item.id === order.id ? { ...item, status: "received" as const, receivedAt: new Date().toISOString() } : item) } });
+            } else {
+              openProduct(undefined, "Producto sellado", { name: order.productName, detail: "Mercancía recibida", stock: order.expectedQuantity, price: 0, image: "" }, order.id);
+            }
+          }}
+        />}
       </div>
 
       {editor && <div className="admin-modal" role="dialog" aria-modal="true"><form className="admin-modal-card" onSubmit={submitEditor}>
-        <div className="admin-modal-head"><h2>{editor.kind === "product" ? (editor.index === undefined ? "Agregar producto" : "Editar producto") : (editor.index === undefined ? "Crear break" : "Editar break")}</h2><button className="admin-close" type="button" onClick={() => setEditor(null)}>×</button></div>
+        <div className="admin-modal-head"><h2>{editor.kind === "product" ? (receivingOrderId ? "Recibir producto e ingresarlo al inventario" : editor.index === undefined ? "Agregar producto" : "Editar producto") : (editor.index === undefined ? "Crear break" : "Editar break")}</h2><button className="admin-close" type="button" onClick={() => { setEditor(null); setReceivingOrderId(null); }}>×</button></div>
         {editor.kind === "product" ? <div className="admin-form-grid">
           <div className="admin-field"><label>Tipo</label><select value={productDraft.category} onChange={(event) => setProductDraft({...productDraft, category:event.target.value})}><option value="Producto sellado">Caja / producto sellado</option><option value="Tarjetas">Tarjeta</option><option value="Hobby box">Hobby box</option><option value="Sobres">Sobre</option></select></div>
           <div className="admin-field"><label>Inventario</label><input type="number" min="0" required value={productDraft.stock} onChange={(event) => setProductDraft({...productDraft, stock:Number(event.target.value)})} /></div>
@@ -301,7 +346,7 @@ export function AdminClient({ email, displayName, signOutPath }: Props) {
           <div className="admin-field"><label>Cupos libres</label><input type="number" min="0" required value={breakDraft.spotsAvailable} onChange={(event) => setBreakDraft({...breakDraft, spotsAvailable:Number(event.target.value)})} /></div>
           {breakDraft.image && <div className="admin-field full"><img className="admin-preview" src={breakDraft.image} alt="Vista previa" /></div>}
         </div>}
-        <div className="admin-modal-actions"><button className="admin-button" type="button" onClick={() => setEditor(null)}>Cancelar</button><button className="admin-button primary" type="submit" disabled={working}>Aplicar al borrador</button></div>
+        <div className="admin-modal-actions"><button className="admin-button" type="button" onClick={() => { setEditor(null); setReceivingOrderId(null); }}>Cancelar</button><button className="admin-button primary" type="submit" disabled={working}>Aplicar al borrador</button></div>
       </form></div>}
     </main>
   );

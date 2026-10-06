@@ -35,7 +35,7 @@ export default async function AdminPage() {
 
   return (
     <>
-      <Script src="/assets/catalog-data.js" strategy="beforeInteractive" />
+      <Script src="/assets/catalog-data.js" strategy="beforeInteractive" />`r`n      <Script src="/assets/october-10-cards.js" strategy="beforeInteractive" />
       <AdminClient
         email={user.email}
         displayName={user.displayName}

@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
 import { requireAdminApi } from "../../../../lib/admin-auth";
 import { isCatalogSnapshot } from "../../../../lib/catalog-types";
+import { mergeOctober10Cards } from "../../../../lib/october-10-cards";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +14,7 @@ export async function GET() {
     "SELECT id, data, updated_at AS updatedAt, updated_by AS updatedBy FROM site_snapshots WHERE id IN (?, ?)",
   ).bind("draft", "published").all<SnapshotRow>();
   const rows = Object.fromEntries(
-    result.results.map((row) => [row.id, { data: JSON.parse(row.data), updatedAt: row.updatedAt, updatedBy: row.updatedBy }]),
+    result.results.map((row) => [row.id, { data: mergeOctober10Cards(JSON.parse(row.data)), updatedAt: row.updatedAt, updatedBy: row.updatedBy }]),
   );
   return Response.json({ draft: rows.draft ?? null, published: rows.published ?? null });
 }

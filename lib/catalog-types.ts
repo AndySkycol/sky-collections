@@ -32,10 +32,13 @@ export type CatalogSnapshot = {
   products: Product[];
   breaks: BreakItem[];
   finance?: import("./finance-types").FinanceData;
+  /** Identifiers for one-time catalog batches that have already been added. */
+  imports?: string[];
 };
 
 export function isCatalogSnapshot(value: unknown): value is CatalogSnapshot {
   if (!value || typeof value !== "object") return false;
   const candidate = value as Partial<CatalogSnapshot>;
-  return Array.isArray(candidate.products) && Array.isArray(candidate.breaks);
+  return Array.isArray(candidate.products) && Array.isArray(candidate.breaks)
+    && (candidate.imports === undefined || Array.isArray(candidate.imports));
 }

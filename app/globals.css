@@ -165,6 +165,7 @@ html, body { min-height: 100%; }
 .admin-panel h1 { margin: 0; color: #092d52; font: 2rem Georgia, serif; }
 .admin-panel p { margin: 3px 0 0; color: #51677c; }
 .admin-filter { margin-bottom: 16px; }
+.admin-search { flex: 1 1 280px; min-height: 42px; padding: 9px 12px; border: 1px solid rgb(9 45 82 / 20%); border-radius: 10px; color: #102a43; background: white; }
 .admin-table-wrap { overflow: auto; }
 .admin-table { width: 100%; min-width: 780px; border-collapse: collapse; }
 .admin-table th, .admin-table td { padding: 13px 10px; text-align: left; border-bottom: 1px solid rgb(9 45 82 / 16%); }

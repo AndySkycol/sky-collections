@@ -11,7 +11,7 @@ export async function GET() {
     if (!row) return Response.json(null, { headers: { "Cache-Control": "no-store" } });
     const snapshot = mergeOctober10Cards(JSON.parse(row.data));
     return Response.json({ products: snapshot.products ?? [], breaks: snapshot.breaks ?? [] }, {
-      headers: { "Cache-Control": "no-store" },
+      headers: { "Cache-Control": "public, max-age=0, s-maxage=10, stale-while-revalidate=30" },
     });
   } catch {
     return Response.json(null, { headers: { "Cache-Control": "no-store" } });

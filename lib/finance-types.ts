@@ -51,7 +51,7 @@ export type IncomingOrder = {
   id: string;
   productName: string;
   expectedQuantity: number;
-  sourceExpenseId: string;
+  sourceExpenseId?: string;
   expectedAt?: string;
   note?: string;
   status: "pending" | "received";
@@ -80,10 +80,17 @@ export type HistoricalMonth = {
   expenses: number;
 };
 
+export type HistoricalWeek = {
+  month: string;
+  week: number;
+  sales: number;
+};
+
 export type FinanceData = {
   version?: number;
   baseline: FinancialBaseline;
   historicalMonths: HistoricalMonth[];
+  historicalWeeks?: HistoricalWeek[];
   customers: Customer[];
   sales: Sale[];
   expenses: Expense[];

@@ -22,16 +22,22 @@ const nowLabel = (value?: string | null) => value ? new Date(value).toLocaleStri
 const countryOptions = ["Argentina", "Brasil", "Colombia", "España", "Francia", "Inglaterra", "Portugal", "Alemania", "Italia", "Bélgica", "Países Bajos", "Noruega", "Uruguay", "México"];
 const teamOptions = ["Real Madrid", "FC Barcelona", "Atlético de Madrid", "Manchester City", "Manchester United", "Liverpool", "Arsenal", "Chelsea", "Bayern Munich", "Borussia Dortmund", "Paris Saint-Germain", "Juventus", "Inter de Milán", "AC Milan", "Napoli", "Tottenham Hotspur"];
 const importedCustomerNames = ["Alejandro Palacios", "Alejo Yepes", "Andres Gutierrez", "Arley Alarcon", "Camilo Figueroa", "Camilo Serna", "Cardlab", "Daniela Aldana", "David Moreno", "David Valero", "Edxon Cubillos", "Esteban Pineda", "Fabian Parra", "Fabian Ramirez", "Fabio Body Soccer", "Jhohanny Ruiz", "Jhonathan Sepulveda", "Jose Cortez", "Juan Duran", "Juan Pablo Vaul", "Julian Camilo", "Luis Mercado", "Luis Venezuela", "Miguel Cabrera", "Muhtasim", "Nestor Castillo", "Rodrigo Velez", "Sara Melo", "Sebastain Mustafa", "Sebastian Duarte", "Serigo Celis", "Valdo", "William Hernandez", "Yolfre"];
+const historicalWeeks = [
+  { month: "2026-08", week: 4, sales: 1338000 }, { month: "2026-08", week: 5, sales: 580000 },
+  { month: "2026-09", week: 1, sales: 1495000 }, { month: "2026-09", week: 2, sales: 1190000 }, { month: "2026-09", week: 3, sales: 1803800 }, { month: "2026-09", week: 4, sales: 1035801 },
+  { month: "2026-10", week: 1, sales: 2995500 },
+];
 
 function defaultFinance(): FinanceData {
   return {
-    version: 2,
+    version: 3,
     baseline: { cutoverDate: "2026-10-05", nequi: 1852213, cash: 156000, debt: 2356037 },
     historicalMonths: [
       { month: "2026-08", sales: 1918000, expenses: 4490487 },
       { month: "2026-09", sales: 5524601, expenses: 5919694 },
       { month: "2026-10", sales: 2995500, expenses: 1262013 },
     ],
+    historicalWeeks,
     customers: importedCustomerNames.map((name, index) => ({ id: `imported-customer-${index + 1}`, name, createdAt: "2026-10-05T00:00:00.000Z" })),
     sales: [], expenses: [], shipments: [], incomingOrders: [], debtPayments: [],
   };
@@ -39,11 +45,12 @@ function defaultFinance(): FinanceData {
 
 function hydrateSnapshot(snapshot: CatalogSnapshot): CatalogSnapshot {
   const metadata = window.SKY_CARD_METADATA ?? {};
-  const finance = !snapshot.finance ? defaultFinance() : snapshot.finance.version === 2 ? snapshot.finance : {
+  const finance = !snapshot.finance ? defaultFinance() : snapshot.finance.version === 3 ? snapshot.finance : {
     ...snapshot.finance,
-    version: 2,
+    version: 3,
     baseline: { ...snapshot.finance.baseline, nequi: snapshot.finance.baseline.nequi === 2797037 ? 1852213 : snapshot.finance.baseline.nequi },
     historicalMonths: snapshot.finance.historicalMonths.map((item) => item.month === "2026-10" && item.expenses === 317189 ? { ...item, expenses: 1262013 } : item),
+    historicalWeeks: snapshot.finance.historicalWeeks?.length ? snapshot.finance.historicalWeeks : historicalWeeks,
   };
   return {
     ...snapshot,
@@ -78,6 +85,7 @@ export function AdminClient({ email, displayName, signOutPath }: Props) {
   const [data, setData] = useState<CatalogSnapshot>({ products: [], breaks: [] });
   const [view, setView] = useState<"products" | "breaks" | "finance">("products");
   const [filter, setFilter] = useState<"boxes" | "cards" | "all">("boxes");
+  const [inventorySearch, setInventorySearch] = useState("");
   const [editor, setEditor] = useState<Editor>(null);
   const [productDraft, setProductDraft] = useState<Product>({ name: "", detail: "", price: 0, stock: 1, image: "", category: "Producto sellado" });
   const [breakDraft, setBreakDraft] = useState<BreakItem>({ id: "", title: "", description: "", image: "", priceOptions: [], spotsTotal: 32, spotsAvailable: 32, status: "active" });
@@ -121,10 +129,12 @@ export function AdminClient({ email, displayName, signOutPath }: Props) {
   }, []);
 
   const visibleProducts = useMemo(() => data.products.filter((product) => {
-    if (filter === "all") return true;
-    const isCard = product.category === "Tarjetas";
-    return filter === "cards" ? isCard : !isCard;
-  }), [data.products, filter]);
+    const categoryMatches = filter === "all" || (filter === "cards" ? product.category === "Tarjetas" : product.category !== "Tarjetas");
+    const terms = inventorySearch.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().split(/\s+/).filter(Boolean);
+    const searchable = [product.name, product.detail, product.category, product.country, product.team].filter(Boolean).join(" ").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    if (!categoryMatches || !terms.every((term) => searchable.includes(term))) return false;
+    return true;
+  }), [data.products, filter, inventorySearch]);
 
   async function saveSnapshot(snapshot: CatalogSnapshot) {
     const response = await fetch("/api/admin/snapshot", {
@@ -286,13 +296,14 @@ export function AdminClient({ email, displayName, signOutPath }: Props) {
             <div className="admin-panel-head"><div><h1>Inventario</h1><p>Agrega, edita, quita productos y actualiza las unidades disponibles.</p></div><div className="admin-actions"><button className="admin-button" onClick={() => openProduct()}>+ Agregar caja</button><button className="admin-button primary" onClick={() => openProduct(undefined, "Tarjetas")}>+ Agregar tarjeta</button></div></div>
             <div className="admin-filter">
               {(["boxes", "cards", "all"] as const).map((value) => <button key={value} className={`admin-button ${filter === value ? "active" : ""}`} onClick={() => setFilter(value)}>{value === "boxes" ? "Cajas" : value === "cards" ? "Tarjetas" : "Todos"}</button>)}
+              <input className="admin-search" type="search" value={inventorySearch} onChange={(event) => setInventorySearch(event.target.value)} placeholder="Buscar producto, jugador, equipo o país" aria-label="Buscar en inventario" />
             </div>
             <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Foto</th><th>Producto</th><th>Tipo</th><th>Precio</th><th>Inventario</th><th>Acciones</th></tr></thead><tbody>
               {visibleProducts.map((product) => {
                 const index = data.products.indexOf(product);
                 return <tr key={`${product.name}-${index}`}><td><img className="admin-thumb" src={product.image} alt="" /></td><td><strong>{product.name}</strong><br /><small>{product.detail || product.category}</small></td><td>{product.category}</td><td>{money.format(Number(product.price) || 0)}</td><td><div className="admin-stock"><button onClick={() => adjustStock(index, -1)}>−</button><strong className={product.stock === 0 ? "admin-stock-zero" : ""}>{product.stock}</strong><button onClick={() => adjustStock(index, 1)}>+</button></div></td><td><div className="admin-row-actions"><button className="admin-link" onClick={() => openProduct(index)}>Editar</button><button className="admin-link" onClick={() => removeProduct(index)}>Quitar</button></div></td></tr>;
               })}
-              {!visibleProducts.length && <tr><td colSpan={6}><div className="admin-empty">No hay productos en esta categoría.</div></td></tr>}
+              {!visibleProducts.length && <tr><td colSpan={6}><div className="admin-empty">No encontramos productos con esa búsqueda.</div></td></tr>}
             </tbody></table></div>
           </section>
         ) : view === "breaks" ? (

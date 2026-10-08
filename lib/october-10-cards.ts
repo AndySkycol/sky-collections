@@ -1,6 +1,7 @@
 import type { CatalogSnapshot, Product } from "./catalog-types";
+import { october10CardsPart2 } from "./october-10-cards-part2";
 
-export const OCTOBER_10_IMPORT_ID = "october-10-rows-1-100";
+export const OCTOBER_10_IMPORT_ID = "october-10-rows-1-475";
 
 export const october10Cards: Product[] = [
   {
@@ -1008,9 +1009,12 @@ export const october10Cards: Product[] = [
 
 export function mergeOctober10Cards(snapshot: CatalogSnapshot): CatalogSnapshot {
   if (snapshot.imports?.includes(OCTOBER_10_IMPORT_ID)) return snapshot;
+  const currentIds = new Set(snapshot.products.map((product) => product.id).filter(Boolean));
+  const cardsToAdd = [...october10Cards, ...october10CardsPart2]
+    .filter((card) => !card.id || !currentIds.has(card.id));
   return {
     ...snapshot,
     imports: [...(snapshot.imports ?? []), OCTOBER_10_IMPORT_ID],
-    products: [...snapshot.products, ...october10Cards],
+    products: [...snapshot.products, ...cardsToAdd],
   };
 }

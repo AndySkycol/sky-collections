@@ -10,7 +10,10 @@ export async function GET() {
     ).bind("published").first<{ data: string; updatedAt: string }>();
     if (!row) return Response.json(null, { headers: { "Cache-Control": "no-store" } });
     const snapshot = mergeOctober10Cards(JSON.parse(row.data));
-    return Response.json({ products: snapshot.products ?? [], breaks: snapshot.breaks ?? [] }, {
+    // Reserved items remain in the administrator's inventory, but must never
+    // be exposed in the public catalogue or added to a visitor's cart.
+    const products = (snapshot.products ?? []).filter((product) => !product.reservation);
+    return Response.json({ products, breaks: snapshot.breaks ?? [] }, {
       headers: { "Cache-Control": "public, max-age=0, s-maxage=10, stale-while-revalidate=30" },
     });
   } catch {

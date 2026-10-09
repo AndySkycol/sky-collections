@@ -12,6 +12,11 @@ export type Product = {
   numbered?: boolean;
   patch?: boolean;
   signature?: boolean;
+  /** A reserved product stays in inventory but is hidden from the public catalog. */
+  reservation?: {
+    customerName: string;
+    reservedAt: string;
+  };
 };
 
 export type PriceOption = { spots: number; price: number };

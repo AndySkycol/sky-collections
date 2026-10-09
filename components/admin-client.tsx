@@ -19,6 +19,15 @@ type Editor = { kind: "product" | "break"; index?: number } | null;
 const money = new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
 const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
 const nowLabel = (value?: string | null) => value ? new Date(value).toLocaleString("es-CO") : "Aún no";
+function reservationDuration(value: string) {
+  const elapsed = Math.max(0, Date.now() - new Date(value).getTime());
+  const minutes = Math.floor(elapsed / 60000);
+  if (minutes < 60) return `${Math.max(1, minutes)} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} h ${minutes % 60} min`;
+  const days = Math.floor(hours / 24);
+  return `${days} día${days === 1 ? "" : "s"} ${hours % 24} h`;
+}
 const countryOptions = ["Argentina", "Brasil", "Colombia", "España", "Francia", "Inglaterra", "Portugal", "Alemania", "Italia", "Bélgica", "Países Bajos", "Noruega", "Uruguay", "México"];
 const teamOptions = ["Real Madrid", "FC Barcelona", "Atlético de Madrid", "Manchester City", "Manchester United", "Liverpool", "Arsenal", "Chelsea", "Bayern Munich", "Borussia Dortmund", "Paris Saint-Germain", "Juventus", "Inter de Milán", "AC Milan", "Napoli", "Tottenham Hotspur"];
 const importedCustomerNames = ["Alejandro Palacios", "Alejo Yepes", "Andres Gutierrez", "Arley Alarcon", "Camilo Figueroa", "Camilo Serna", "Cardlab", "Daniela Aldana", "David Moreno", "David Valero", "Edxon Cubillos", "Esteban Pineda", "Fabian Parra", "Fabian Ramirez", "Fabio Body Soccer", "Jhohanny Ruiz", "Jhonathan Sepulveda", "Jose Cortez", "Juan Duran", "Juan Pablo Vaul", "Julian Camilo", "Luis Mercado", "Luis Venezuela", "Miguel Cabrera", "Muhtasim", "Nestor Castillo", "Rodrigo Velez", "Sara Melo", "Sebastain Mustafa", "Sebastian Duarte", "Serigo Celis", "Valdo", "William Hernandez", "Yolfre"];
@@ -83,7 +92,7 @@ function optionsText(item: BreakItem) {
 
 export function AdminClient({ email, displayName, signOutPath }: Props) {
   const [data, setData] = useState<CatalogSnapshot>({ products: [], breaks: [] });
-  const [view, setView] = useState<"products" | "breaks" | "finance">("products");
+  const [view, setView] = useState<"products" | "reserved" | "breaks" | "finance">("products");
   const [filter, setFilter] = useState<"boxes" | "cards" | "all">("boxes");
   const [inventorySearch, setInventorySearch] = useState("");
   const [editor, setEditor] = useState<Editor>(null);
@@ -99,6 +108,15 @@ export function AdminClient({ email, displayName, signOutPath }: Props) {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [receivingOrderId, setReceivingOrderId] = useState<string | null>(null);
+  const [reservationIndex, setReservationIndex] = useState<number | null>(null);
+  const [reservationCustomer, setReservationCustomer] = useState("");
+  const [reservedSale, setReservedSale] = useState<{ productIndex: number; customerName: string; key: string } | null>(null);
+  const [, setReservationClock] = useState(0);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setReservationClock((tick) => tick + 1), 60000);
+    return () => window.clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     async function load() {
@@ -135,6 +153,7 @@ export function AdminClient({ email, displayName, signOutPath }: Props) {
     if (!categoryMatches || !terms.every((term) => searchable.includes(term))) return false;
     return true;
   }), [data.products, filter, inventorySearch]);
+  const reservedProducts = useMemo(() => data.products.map((product, index) => ({ product, index })).filter(({ product }) => Boolean(product.reservation)), [data.products]);
 
   async function saveSnapshot(snapshot: CatalogSnapshot) {
     const response = await fetch("/api/admin/snapshot", {
@@ -257,6 +276,40 @@ export function AdminClient({ email, displayName, signOutPath }: Props) {
     changeData({ ...data, products });
   }
 
+  function openReservation(index: number) {
+    setReservationIndex(index);
+    setReservationCustomer(data.products[index].reservation?.customerName ?? "");
+  }
+
+  function saveReservation(event: FormEvent) {
+    event.preventDefault();
+    if (reservationIndex === null || !reservationCustomer.trim()) return;
+    const products = clone(data.products);
+    products[reservationIndex].reservation = {
+      customerName: reservationCustomer.trim(),
+      reservedAt: products[reservationIndex].reservation?.reservedAt ?? new Date().toISOString(),
+    };
+    changeData({ ...data, products });
+    setReservationIndex(null);
+    setMessage("Producto reservado. Publica los cambios cuando quieras ocultarlo del catálogo de clientes.");
+  }
+
+  function releaseReservation(index: number) {
+    const product = data.products[index];
+    if (!confirm(`¿Devolver ${product.name} al catálogo disponible?`)) return;
+    const products = clone(data.products);
+    delete products[index].reservation;
+    changeData({ ...data, products });
+    setMessage("Producto devuelto al catálogo. Publica los cambios cuando quieras mostrarlo de nuevo a los clientes.");
+  }
+
+  function sellReserved(index: number) {
+    const product = data.products[index];
+    if (!product.reservation) return;
+    setReservedSale({ productIndex: index, customerName: product.reservation.customerName, key: `${Date.now()}-${index}` });
+    setView("finance");
+  }
+
   function removeBreak(index: number) {
     if (!confirm("¿Quitar este break?")) return;
     const breaks = data.breaks.filter((_, itemIndex) => itemIndex !== index);
@@ -287,6 +340,7 @@ export function AdminClient({ email, displayName, signOutPath }: Props) {
 
         <nav className="admin-tabs" aria-label="Secciones">
           <button className={`admin-button ${view === "products" ? "active" : ""}`} onClick={() => setView("products")}>Cajas y tarjetas</button>
+          <button className={`admin-button ${view === "reserved" ? "active" : ""}`} onClick={() => setView("reserved")}>Reservados{reservedProducts.length ? ` (${reservedProducts.length})` : ""}</button>
           <button className={`admin-button ${view === "breaks" ? "active" : ""}`} onClick={() => setView("breaks")}>Breaks</button>
           <button className={`admin-button ${view === "finance" ? "active" : ""}`} onClick={() => setView("finance")}>Finanzas</button>
         </nav>
@@ -301,10 +355,18 @@ export function AdminClient({ email, displayName, signOutPath }: Props) {
             <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Foto</th><th>Producto</th><th>Tipo</th><th>Precio</th><th>Inventario</th><th>Acciones</th></tr></thead><tbody>
               {visibleProducts.map((product) => {
                 const index = data.products.indexOf(product);
-                return <tr key={`${product.name}-${index}`}><td><img className="admin-thumb" src={product.image} alt="" /></td><td><strong>{product.name}</strong><br /><small>{product.detail || product.category}</small></td><td>{product.category}</td><td>{money.format(Number(product.price) || 0)}</td><td><div className="admin-stock"><button onClick={() => adjustStock(index, -1)}>−</button><strong className={product.stock === 0 ? "admin-stock-zero" : ""}>{product.stock}</strong><button onClick={() => adjustStock(index, 1)}>+</button></div></td><td><div className="admin-row-actions"><button className="admin-link" onClick={() => openProduct(index)}>Editar</button><button className="admin-link" onClick={() => removeProduct(index)}>Quitar</button></div></td></tr>;
+                return <tr key={`${product.name}-${index}`}><td><img className="admin-thumb" src={product.image} alt="" /></td><td><strong>{product.name}</strong><br /><small>{product.detail || product.category}{product.reservation ? ` · Reservado para ${product.reservation.customerName}` : ""}</small></td><td>{product.category}</td><td>{money.format(Number(product.price) || 0)}</td><td><div className="admin-stock"><button onClick={() => adjustStock(index, -1)}>−</button><strong className={product.stock === 0 ? "admin-stock-zero" : ""}>{product.stock}</strong><button onClick={() => adjustStock(index, 1)}>+</button></div></td><td><div className="admin-row-actions"><button className="admin-link" onClick={() => openProduct(index)}>Editar</button>{product.reservation ? <button className="admin-link" onClick={() => openReservation(index)}>Editar reserva</button> : <button className="admin-link" disabled={product.stock < 1} onClick={() => openReservation(index)}>Reservar</button>}<button className="admin-link" onClick={() => removeProduct(index)}>Quitar</button></div></td></tr>;
               })}
               {!visibleProducts.length && <tr><td colSpan={6}><div className="admin-empty">No encontramos productos con esa búsqueda.</div></td></tr>}
             </tbody></table></div>
+          </section>
+        ) : view === "reserved" ? (
+          <section className="admin-panel">
+            <div className="admin-panel-head"><div><h1>Productos reservados</h1><p>Estos productos no se muestran en el catálogo de clientes.</p></div></div>
+            <div className="admin-reserved-list">
+              {reservedProducts.map(({ product, index }) => <article key={`${product.name}-${index}`}><img className="admin-thumb" src={product.image} alt="" /><div><strong>{product.name}</strong><small>{product.detail || product.category} · {money.format(Number(product.price) || 0)}</small><p>Reservado por <strong>{product.reservation!.customerName}</strong> · hace {reservationDuration(product.reservation!.reservedAt)}</p></div><div className="admin-row-actions"><button className="admin-button primary" onClick={() => sellReserved(index)}>Registrar venta</button><button className="admin-button" onClick={() => releaseReservation(index)}>Volver al catálogo</button></div></article>)}
+              {!reservedProducts.length && <div className="admin-empty">No hay productos reservados.</div>}
+            </div>
           </section>
         ) : view === "breaks" ? (
           <section className="admin-panel">
@@ -317,6 +379,8 @@ export function AdminClient({ email, displayName, signOutPath }: Props) {
         ) : data.finance && <FinancePanel
           data={data.finance}
           products={data.products}
+          reservedSale={reservedSale}
+          onReservedSaleHandled={() => setReservedSale(null)}
           onChange={(finance, products = data.products) => changeData({ ...data, finance, products })}
           onReceiveIncoming={(order, existingProductIndex) => {
             if (existingProductIndex !== undefined) {
@@ -358,6 +422,12 @@ export function AdminClient({ email, displayName, signOutPath }: Props) {
           {breakDraft.image && <div className="admin-field full"><img className="admin-preview" src={breakDraft.image} alt="Vista previa" /></div>}
         </div>}
         <div className="admin-modal-actions"><button className="admin-button" type="button" onClick={() => { setEditor(null); setReceivingOrderId(null); }}>Cancelar</button><button className="admin-button primary" type="submit" disabled={working}>Aplicar al borrador</button></div>
+      </form></div>}
+
+      {reservationIndex !== null && <div className="admin-modal" role="dialog" aria-modal="true"><form className="admin-modal-card reservation-modal" onSubmit={saveReservation}>
+        <div className="admin-modal-head"><h2>Reservar producto</h2><button className="admin-close" type="button" onClick={() => setReservationIndex(null)}>×</button></div>
+        <div className="admin-form-grid"><div className="admin-field full"><p><strong>{data.products[reservationIndex].name}</strong> dejará de aparecer en el catálogo de clientes cuando publiques los cambios.</p></div><div className="admin-field full"><label>Nombre de quien reserva</label><input required list="reservation-customers" value={reservationCustomer} onChange={(event) => setReservationCustomer(event.target.value)} placeholder="Escribe o selecciona un cliente" /><datalist id="reservation-customers">{data.finance?.customers.map((customer) => <option key={customer.id} value={customer.name} />)}</datalist></div></div>
+        <div className="admin-modal-actions"><button className="admin-button" type="button" onClick={() => setReservationIndex(null)}>Cancelar</button><button className="admin-button primary" type="submit">Reservar producto</button></div>
       </form></div>}
     </main>
   );

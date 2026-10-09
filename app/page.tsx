@@ -24,7 +24,7 @@ export default function Home() {
           const snapshot: CatalogSnapshot | null = response.ok
             ? await response.json()
             : null;
-          if (snapshot?.products?.length) {
+          if (snapshot?.products) {
             localStorage.setItem("skyAdminProducts", JSON.stringify(snapshot.products));
             localStorage.setItem("skyAdminBreaks", JSON.stringify(snapshot.breaks ?? []));
             latestSnapshot.current = snapshot;

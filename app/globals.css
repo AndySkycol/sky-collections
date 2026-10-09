@@ -176,6 +176,12 @@ html, body { min-height: 100%; }
 .admin-stock-zero { color: #a13c3c; }
 .admin-link { border: 0; padding: 0; color: #125f91; background: transparent; font-weight: 800; text-decoration: underline; cursor: pointer; }
 .admin-break-list { display: grid; gap: 14px; }
+.admin-reserved-list { display: grid; gap: 12px; }
+.admin-reserved-list article { display: grid; grid-template-columns: 54px minmax(0, 1fr) auto; gap: 13px; align-items: center; padding: 13px; border: 1px solid rgb(9 45 82 / 16%); border-radius: 14px; background: #fffaf0; }
+.admin-reserved-list strong, .admin-reserved-list small { display: block; }
+.admin-reserved-list small { margin-top: 3px; color: #51677c; font-size: .8rem; }
+.admin-reserved-list p { margin-top: 7px; font-size: .82rem; }
+.admin-reserved-list p strong { display: inline; color: #092d52; }
 .admin-break-row { display: grid; grid-template-columns: 86px 1fr auto; gap: 15px; align-items: center; padding: 14px; border: 1px solid rgb(9 45 82 / 16%); border-radius: 14px; background: white; }
 .admin-break-row img { width: 86px; height: 68px; object-fit: cover; border-radius: 10px; }
 .admin-break-row h3 { margin: 0; color: #092d52; font: 1.15rem Georgia, serif; }
@@ -253,6 +259,9 @@ html, body { min-height: 100%; }
   .admin-break-row { grid-template-columns: 64px 1fr; }
   .admin-break-row img { width: 64px; height: 56px; }
   .admin-break-row .admin-row-actions { grid-column: 1 / -1; }
+  .admin-reserved-list article { grid-template-columns: 50px minmax(0, 1fr); }
+  .admin-reserved-list .admin-row-actions { grid-column: 1 / -1; }
+  .admin-reserved-list .admin-row-actions .admin-button { flex: 1; }
   .finance-kpis, .finance-kpis-five, .finance-grid, .finance-grid.wide { grid-template-columns: 1fr; }
   .finance-kpis { gap: 9px; }
   .finance-kpis article { min-height: auto; }
@@ -272,6 +281,10 @@ html, body { min-height: 100%; }
 .finance-product-placeholder { display: grid; height: 88px; place-items: center; border-radius: 7px; color: #51677c; background: #f5efe1; font-size: .76rem; }
 .finance-no-products, .finance-selected-product { margin: 10px 0 0; color: #51677c; font-size: .85rem; }
 .finance-selected-product strong { color: #092d52; }
+.finance-sale-lines { display: grid; gap: 8px; margin-top: 12px; padding: 12px; border: 1px solid rgb(9 45 82 / 14%); border-radius: 12px; background: #fffdf7; }
+.finance-sale-lines > strong { color: #092d52; }
+.finance-sale-lines > div { display: grid; grid-template-columns: minmax(130px, 1fr) auto auto auto auto; gap: 9px; align-items: center; padding-top: 8px; border-top: 1px solid rgb(9 45 82 / 10%); font-size: .83rem; }
+.finance-sale-lines small { color: #51677c; }
 .finance-merchandise { display: grid; gap: 9px; padding: 13px; border: 1px solid rgb(9 45 82 / 14%); border-radius: 12px; background: #fffdf7; }
 .finance-merch-row { display: grid; grid-template-columns: minmax(160px, 1fr) 90px 145px auto; gap: 8px; align-items: center; }
 .finance-records { min-height: 350px; }
@@ -279,6 +292,9 @@ html, body { min-height: 100%; }
   .finance-product-filters { grid-template-columns: 1fr 1fr; }
   .finance-product-filters input { grid-column: 1 / -1; }
   .finance-product-picker { grid-template-columns: repeat(2, minmax(0, 1fr)); max-height: 360px; }
+  .finance-sale-lines > div { grid-template-columns: 1fr auto auto; }
+  .finance-sale-lines > div > small { grid-column: 1; }
+  .finance-sale-lines > div > .admin-stock { grid-column: 2; grid-row: 1 / span 2; }
   .finance-merch-row { grid-template-columns: 1fr 92px; }
   .finance-merch-row input[type="date"] { grid-column: 1 / -1; }
 }

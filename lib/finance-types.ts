@@ -22,6 +22,33 @@ export type Sale = {
   customerId?: string;
   items: SaleItem[];
   paymentAccount: PaymentAccount;
+  /** Parte de la venta que el cliente aún no ha pagado. */
+  pendingAmount?: number;
+  note?: string;
+  createdAt: string;
+};
+
+export type ReceivableConcept = {
+  name: string;
+  amount: number;
+};
+
+export type ReceivablePayment = {
+  id: string;
+  amount: number;
+  paymentAccount: Exclude<PaymentAccount, "debt">;
+  occurredAt: string;
+  note?: string;
+};
+
+/** Saldo que un cliente debe a Sky Collections. */
+export type CustomerReceivable = {
+  id: string;
+  customerId: string;
+  occurredAt: string;
+  concepts: ReceivableConcept[];
+  payments: ReceivablePayment[];
+  sourceSaleId?: string;
   note?: string;
   createdAt: string;
 };
@@ -97,4 +124,5 @@ export type FinanceData = {
   shipments: Shipment[];
   incomingOrders: IncomingOrder[];
   debtPayments: DebtPayment[];
+  customerReceivables?: CustomerReceivable[];
 };

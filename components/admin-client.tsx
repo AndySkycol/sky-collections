@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FocusEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { BreakItem, CatalogSnapshot, Product } from "../lib/catalog-types";
 import type { FinanceData } from "../lib/finance-types";
 import { FinancePanel } from "./finance-panel";
@@ -17,6 +17,7 @@ type Props = { email: string; displayName: string; signOutPath: string };
 type Editor = { kind: "product" | "break"; index?: number } | null;
 
 const money = new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
+const selectZero = (event: FocusEvent<HTMLInputElement>) => { if (event.currentTarget.value === "0") event.currentTarget.select(); };
 const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
 const nowLabel = (value?: string | null) => value ? new Date(value).toLocaleString("es-CO") : "Aún no";
 function reservationDuration(value: string) {
@@ -48,7 +49,7 @@ function defaultFinance(): FinanceData {
     ],
     historicalWeeks,
     customers: importedCustomerNames.map((name, index) => ({ id: `imported-customer-${index + 1}`, name, createdAt: "2026-10-05T00:00:00.000Z" })),
-    sales: [], expenses: [], shipments: [], incomingOrders: [], debtPayments: [],
+    sales: [], expenses: [], shipments: [], incomingOrders: [], debtPayments: [], customerReceivables: [],
   };
 }
 
@@ -92,7 +93,7 @@ function optionsText(item: BreakItem) {
 
 export function AdminClient({ email, displayName, signOutPath }: Props) {
   const [data, setData] = useState<CatalogSnapshot>({ products: [], breaks: [] });
-  const [view, setView] = useState<"products" | "reserved" | "breaks" | "finance">("products");
+  const [view, setView] = useState<"products" | "reserved" | "breaks" | "promotion" | "finance">("products");
   const [filter, setFilter] = useState<"boxes" | "cards" | "all">("boxes");
   const [inventorySearch, setInventorySearch] = useState("");
   const [editor, setEditor] = useState<Editor>(null);
@@ -100,6 +101,9 @@ export function AdminClient({ email, displayName, signOutPath }: Props) {
   const [breakDraft, setBreakDraft] = useState<BreakItem>({ id: "", title: "", description: "", image: "", priceOptions: [], spotsTotal: 32, spotsAvailable: 32, status: "active" });
   const [optionsDraft, setOptionsDraft] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [promotionFile, setPromotionFile] = useState<File | null>(null);
+  const [promotionNoteTitle, setPromotionNoteTitle] = useState("Quiénes somos");
+  const [promotionNoteMessage, setPromotionNoteMessage] = useState("Somos una pareja que quiso hacer realidad el sueño de compartir el coleccionismo con todos los apasionados. Por eso fundamos Sky Collections. Estamos muy agradecidos por el apoyo y la confianza que nos dan con cada compra; por eso tratamos de traerles siempre las mejores actividades y los mejores productos. Hacemos lives seguido por nuestro canal de TikTok, donde podemos emocionarnos juntos con cada apertura.");
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -112,6 +116,9 @@ export function AdminClient({ email, displayName, signOutPath }: Props) {
   const [reservationCustomer, setReservationCustomer] = useState("");
   const [reservedSale, setReservedSale] = useState<{ productIndex: number; customerName: string; key: string } | null>(null);
   const [, setReservationClock] = useState(0);
+  const latestData = useRef(data);
+
+  useEffect(() => { latestData.current = data; }, [data]);
 
   useEffect(() => {
     const interval = window.setInterval(() => setReservationClock((tick) => tick + 1), 60000);
@@ -125,7 +132,10 @@ export function AdminClient({ email, displayName, signOutPath }: Props) {
         if (!response.ok) throw new Error((await response.json()).error || "No se pudo cargar el panel.");
         const result = await response.json();
         if (result.draft?.data) {
+          const hydrated = hydrateSnapshot(result.draft.data);
           setData(hydrateSnapshot(result.draft.data));
+          setPromotionNoteTitle(hydrated.promotion?.noteTitle || "Quiénes somos");
+          setPromotionNoteMessage(hydrated.promotion?.noteMessage || "Somos una pareja que quiso hacer realidad el sueño de compartir el coleccionismo con todos los apasionados. Por eso fundamos Sky Collections. Estamos muy agradecidos por el apoyo y la confianza que nos dan con cada compra; por eso tratamos de traerles siempre las mejores actividades y los mejores productos. Hacemos lives seguido por nuestro canal de TikTok, donde podemos emocionarnos juntos con cada apertura.");
           setSavedAt(result.draft.updatedAt);
           setPublishedAt(result.published?.updatedAt ?? null);
         } else {
@@ -179,6 +189,24 @@ export function AdminClient({ email, displayName, signOutPath }: Props) {
     setMessage(null);
     setError(null);
   }
+
+  useEffect(() => {
+    if (!dirty || loading) return;
+    const snapshot = data;
+    const timer = window.setTimeout(async () => {
+      try {
+        const result = await saveSnapshot(snapshot);
+        if (latestData.current === snapshot) {
+          setSavedAt(result.updatedAt);
+          setDirty(false);
+          setMessage("Borrador guardado automáticamente. La página pública todavía no cambió.");
+        }
+      } catch (cause) {
+        if (latestData.current === snapshot) setError(cause instanceof Error ? cause.message : "No se pudo guardar automáticamente.");
+      }
+    }, 700);
+    return () => window.clearTimeout(timer);
+  }, [data, dirty, loading]);
 
   async function handleSave() {
     setWorking(true); setError(null); setMessage(null);
@@ -239,6 +267,35 @@ export function AdminClient({ email, displayName, signOutPath }: Props) {
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || "No se pudo subir la imagen.");
     return result.url as string;
+  }
+
+  async function savePromotion() {
+    setWorking(true); setError(null); setMessage(null);
+    try {
+      const uploaded = await uploadImage(promotionFile);
+      changeData({ ...data, promotion: { image: uploaded || data.promotion?.image || "", noteTitle: promotionNoteTitle.trim(), noteMessage: promotionNoteMessage.trim() } });
+      setPromotionFile(null);
+      setMessage("Promoción preparada. Guarda el borrador o publícala cuando termines.");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "No se pudo preparar la promoción.");
+    } finally { setWorking(false); }
+  }
+
+  function clearPromotion() {
+    setPromotionFile(null); setPromotionNoteTitle("Quiénes somos"); setPromotionNoteMessage("Somos una pareja que quiso hacer realidad el sueño de compartir el coleccionismo con todos los apasionados. Por eso fundamos Sky Collections. Estamos muy agradecidos por el apoyo y la confianza que nos dan con cada compra; por eso tratamos de traerles siempre las mejores actividades y los mejores productos. Hacemos lives seguido por nuestro canal de TikTok, donde podemos emocionarnos juntos con cada apertura.");
+    changeData({ ...data, promotion: undefined });
+    setMessage("Se restaurará la selección automática de productos al guardar o publicar.");
+  }
+
+  function previewPromotion() {
+    const image = promotionFile ? URL.createObjectURL(promotionFile) : (data.promotion?.image || "");
+    const preview = { ...clone(data), promotion: { image, noteTitle: promotionNoteTitle.trim(), noteMessage: promotionNoteMessage.trim() } };
+    const previewWindow = window.open("/?preview=promotion", "sky-promotion-preview");
+    if (!previewWindow) {
+      setError("El navegador bloqueó la vista previa. Permite las ventanas emergentes e inténtalo de nuevo.");
+      return;
+    }
+    [500, 1200, 2200].forEach((delay) => window.setTimeout(() => previewWindow.postMessage({ type: "sky-promotion-preview", snapshot: preview }, window.location.origin), delay));
   }
 
   async function submitEditor(event: FormEvent) {
@@ -342,6 +399,7 @@ export function AdminClient({ email, displayName, signOutPath }: Props) {
           <button className={`admin-button ${view === "products" ? "active" : ""}`} onClick={() => setView("products")}>Cajas y tarjetas</button>
           <button className={`admin-button ${view === "reserved" ? "active" : ""}`} onClick={() => setView("reserved")}>Reservados{reservedProducts.length ? ` (${reservedProducts.length})` : ""}</button>
           <button className={`admin-button ${view === "breaks" ? "active" : ""}`} onClick={() => setView("breaks")}>Breaks</button>
+          <button className={`admin-button ${view === "promotion" ? "active" : ""}`} onClick={() => setView("promotion")}>Inicio</button>
           <button className={`admin-button ${view === "finance" ? "active" : ""}`} onClick={() => setView("finance")}>Finanzas</button>
         </nav>
 
@@ -376,6 +434,17 @@ export function AdminClient({ email, displayName, signOutPath }: Props) {
               {!data.breaks.length && <div className="admin-empty">Aún no hay breaks.</div>}
             </div>
           </section>
+        ) : view === "promotion" ? (
+          <section className="admin-panel">
+            <div className="admin-panel-head"><div><h1>Promoción del inicio</h1><p>Es opcional. Úsala para anunciar un evento, un break o una novedad destacada.</p></div></div>
+            <div className="admin-form-grid">
+              <div className="admin-field full"><label>Imagen de promoción</label><input type="file" accept="image/*" onChange={(event) => setPromotionFile(event.target.files?.[0] ?? null)} /><small>La imagen tendrá todo el protagonismo. Si la quitas, el inicio mostrará automáticamente productos disponibles de mayor valor.</small></div>
+              <div className="admin-field"><label>Título de la nota</label><input value={promotionNoteTitle} onChange={(event) => setPromotionNoteTitle(event.target.value)} placeholder="Quiénes somos" /></div>
+              <div className="admin-field full"><label>Mensaje de la nota</label><textarea value={promotionNoteMessage} onChange={(event) => setPromotionNoteMessage(event.target.value)} /></div>
+              {data.promotion?.image && <div className="admin-field full"><img className="admin-preview" src={data.promotion.image} alt="Promoción actual" /></div>}
+            </div>
+            <div className="admin-actions"><button className="admin-button blue" onClick={previewPromotion}>Ver vista previa</button><button className="admin-button primary" onClick={savePromotion} disabled={working}>Aplicar promoción al borrador</button><button className="admin-button danger" onClick={clearPromotion}>Quitar promoción</button></div>
+          </section>
         ) : data.finance && <FinancePanel
           data={data.finance}
           products={data.products}
@@ -398,7 +467,7 @@ export function AdminClient({ email, displayName, signOutPath }: Props) {
         <div className="admin-modal-head"><h2>{editor.kind === "product" ? (receivingOrderId ? "Recibir producto e ingresarlo al inventario" : editor.index === undefined ? "Agregar producto" : "Editar producto") : (editor.index === undefined ? "Crear break" : "Editar break")}</h2><button className="admin-close" type="button" onClick={() => { setEditor(null); setReceivingOrderId(null); }}>×</button></div>
         {editor.kind === "product" ? <div className="admin-form-grid">
           <div className="admin-field"><label>Tipo</label><select value={productDraft.category} onChange={(event) => setProductDraft({...productDraft, category:event.target.value})}><option value="Producto sellado">Caja / producto sellado</option><option value="Tarjetas">Tarjeta</option><option value="Hobby box">Hobby box</option><option value="Sobres">Sobre</option></select></div>
-          <div className="admin-field"><label>Inventario</label><input type="number" min="0" required value={productDraft.stock} onChange={(event) => setProductDraft({...productDraft, stock:Number(event.target.value)})} /></div>
+          <div className="admin-field"><label>Inventario</label><input type="number" onFocus={selectZero} min="0" required value={productDraft.stock || ""} onChange={(event) => setProductDraft({...productDraft, stock:Number(event.target.value)})} /></div>
           <div className="admin-field full"><label>Nombre del jugador o producto</label><input required value={productDraft.name} onChange={(event) => setProductDraft({...productDraft, name:event.target.value})} /></div>
           <div className="admin-field full"><label>Colección, tipo o variante</label><input value={productDraft.detail ?? ""} onChange={(event) => setProductDraft({...productDraft, detail:event.target.value})} placeholder="Ej. Panini Select · Patch /25" /></div>
           {productDraft.category === "Tarjetas" && <>
@@ -406,7 +475,7 @@ export function AdminClient({ email, displayName, signOutPath }: Props) {
             <div className="admin-field"><label>Equipo <small>(opcional)</small></label><select value={productDraft.team ?? ""} onChange={(event) => setProductDraft({...productDraft, team:event.target.value})}><option value="">Sin seleccionar</option>{teamOptions.map((team) => <option key={team} value={team}>{team}</option>)}</select></div>
             <div className="admin-field full"><label>Atributos de la tarjeta <small>(opcionales)</small></label><div className="admin-checks"><label><input type="checkbox" checked={Boolean(productDraft.numbered)} onChange={(event) => setProductDraft({...productDraft, numbered:event.target.checked})} /> Numerada</label><label><input type="checkbox" checked={Boolean(productDraft.patch)} onChange={(event) => setProductDraft({...productDraft, patch:event.target.checked})} /> Patch</label><label><input type="checkbox" checked={Boolean(productDraft.signature)} onChange={(event) => setProductDraft({...productDraft, signature:event.target.checked})} /> Firma</label></div></div>
           </>}
-          <div className="admin-field"><label>Precio (COP)</label><input type="number" min="0" required value={productDraft.price} onChange={(event) => setProductDraft({...productDraft, price:Number(event.target.value)})} /></div>
+          <div className="admin-field"><label>Precio (COP)</label><input type="number" onFocus={selectZero} min="0" required value={productDraft.price || ""} onChange={(event) => setProductDraft({...productDraft, price:Number(event.target.value)})} /></div>
           <div className="admin-field"><label>Imagen actual</label><input value={productDraft.image} onChange={(event) => setProductDraft({...productDraft, image:event.target.value})} placeholder="URL o ruta" /></div>
           <div className="admin-field full"><label>Subir una foto nueva</label><input type="file" accept="image/*" onChange={(event) => setImageFile(event.target.files?.[0] ?? null)} /><small>JPG, PNG o WEBP, máximo 10 MB.</small></div>
           {productDraft.image && <div className="admin-field full"><img className="admin-preview" src={productDraft.image} alt="Vista previa" /></div>}
@@ -417,8 +486,8 @@ export function AdminClient({ email, displayName, signOutPath }: Props) {
           <div className="admin-field"><label>Imagen actual</label><input value={breakDraft.image} onChange={(event) => setBreakDraft({...breakDraft, image:event.target.value})} /></div>
           <div className="admin-field full"><label>Subir una foto nueva</label><input type="file" accept="image/*" onChange={(event) => setImageFile(event.target.files?.[0] ?? null)} /></div>
           <div className="admin-field full"><label>Opciones de reserva y precio (COP)</label><textarea value={optionsDraft} onChange={(event) => setOptionsDraft(event.target.value)} placeholder={"1: 50000\n2: 90000\n5: 200000"} /><small>Una opción por línea: cantidad de spots: precio. Puedes poner una sola opción o todas las que necesites.</small></div>
-          <div className="admin-field"><label>Cupos totales</label><input type="number" min="0" required value={breakDraft.spotsTotal} onChange={(event) => setBreakDraft({...breakDraft, spotsTotal:Number(event.target.value)})} /></div>
-          <div className="admin-field"><label>Cupos libres</label><input type="number" min="0" required value={breakDraft.spotsAvailable} onChange={(event) => setBreakDraft({...breakDraft, spotsAvailable:Number(event.target.value)})} /></div>
+          <div className="admin-field"><label>Cupos totales</label><input type="number" onFocus={selectZero} min="0" required value={breakDraft.spotsTotal || ""} onChange={(event) => setBreakDraft({...breakDraft, spotsTotal:Number(event.target.value)})} /></div>
+          <div className="admin-field"><label>Cupos libres</label><input type="number" onFocus={selectZero} min="0" required value={breakDraft.spotsAvailable || ""} onChange={(event) => setBreakDraft({...breakDraft, spotsAvailable:Number(event.target.value)})} /></div>
           {breakDraft.image && <div className="admin-field full"><img className="admin-preview" src={breakDraft.image} alt="Vista previa" /></div>}
         </div>}
         <div className="admin-modal-actions"><button className="admin-button" type="button" onClick={() => { setEditor(null); setReceivingOrderId(null); }}>Cancelar</button><button className="admin-button primary" type="submit" disabled={working}>Aplicar al borrador</button></div>

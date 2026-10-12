@@ -13,7 +13,7 @@ export async function GET() {
     // Reserved items remain in the administrator's inventory, but must never
     // be exposed in the public catalogue or added to a visitor's cart.
     const products = (snapshot.products ?? []).filter((product) => !product.reservation);
-    return Response.json({ products, breaks: snapshot.breaks ?? [] }, {
+    return Response.json({ products, breaks: snapshot.breaks ?? [], promotion: snapshot.promotion }, {
       headers: { "Cache-Control": "public, max-age=0, s-maxage=10, stale-while-revalidate=30" },
     });
   } catch {

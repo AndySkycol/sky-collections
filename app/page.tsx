@@ -16,6 +16,18 @@ export default function Home() {
 
   useEffect(() => {
     let active = true;
+    let previewing = false;
+    const withoutPromotion = new URLSearchParams(window.location.search).get("preview") === "no-promo";
+
+    const receivePreview = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin || event.data?.type !== "sky-promotion-preview") return;
+      const snapshot = event.data.snapshot as CatalogSnapshot | undefined;
+      if (!snapshot?.products) return;
+      previewing = true;
+      latestSnapshot.current = snapshot;
+      sendSnapshot(snapshot);
+    };
+    window.addEventListener("message", receivePreview);
 
     const refreshCatalog = async () => {
       for (let attempt = 0; attempt < 3 && active; attempt += 1) {
@@ -24,11 +36,12 @@ export default function Home() {
           const snapshot: CatalogSnapshot | null = response.ok
             ? await response.json()
             : null;
-          if (snapshot?.products) {
-            localStorage.setItem("skyAdminProducts", JSON.stringify(snapshot.products));
-            localStorage.setItem("skyAdminBreaks", JSON.stringify(snapshot.breaks ?? []));
-            latestSnapshot.current = snapshot;
-            sendSnapshot(snapshot);
+          if (snapshot?.products && !previewing) {
+            const displaySnapshot = withoutPromotion ? { ...snapshot, promotion: undefined } : snapshot;
+            localStorage.setItem("skyAdminProducts", JSON.stringify(displaySnapshot.products));
+            localStorage.setItem("skyAdminBreaks", JSON.stringify(displaySnapshot.breaks ?? []));
+            latestSnapshot.current = displaySnapshot;
+            sendSnapshot(displaySnapshot);
             return;
           }
         } catch {
@@ -39,7 +52,7 @@ export default function Home() {
     };
 
     void refreshCatalog();
-    return () => { active = false; };
+    return () => { active = false; window.removeEventListener("message", receivePreview); };
   }, []);
 
   return (

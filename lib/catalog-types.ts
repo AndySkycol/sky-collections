@@ -33,9 +33,16 @@ export type BreakItem = {
   published?: number;
 };
 
+export type HomePromotion = {
+  image?: string;
+  noteTitle?: string;
+  noteMessage?: string;
+};
+
 export type CatalogSnapshot = {
   products: Product[];
   breaks: BreakItem[];
+  promotion?: HomePromotion;
   finance?: import("./finance-types").FinanceData;
   /** Identifiers for one-time catalog batches that have already been added. */
   imports?: string[];

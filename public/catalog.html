@@ -23,9 +23,94 @@ footer{padding:40px 0 30px;color:#fff;background:var(--navy)}.footer-main{displa
 @media(max-width:930px){.site-header{backdrop-filter:none}}
 .card-filters{margin:-8px 0 28px;padding:18px;border:1px solid rgba(18,95,145,.24);border-radius:18px;background:rgba(255,252,244,.86);box-shadow:0 10px 28px rgba(9,45,82,.08)}.card-filter-head{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:14px;color:var(--navy)}.card-filter-head strong{font:700 1.08rem Georgia,serif}.card-filter-head button{border:0;color:var(--blue);background:transparent;font-weight:800;text-decoration:underline}.card-filter-options{display:flex;flex-wrap:wrap;align-items:end;gap:10px}.card-filter-options label{display:grid;gap:5px;color:var(--muted);font-size:.76rem;font-weight:800}.card-filter-options select,.card-filter-toggle{min-height:42px;padding:0 12px;border:1px solid var(--line);border-radius:10px;color:var(--ink);background:#fff;font:inherit}.card-filter-toggle{font-size:.88rem}.card-filter-toggle[aria-pressed=true]{border-color:var(--blue);color:#fff;background:var(--blue)}@media(max-width:650px){.card-filter-options{display:grid;grid-template-columns:1fr 1fr}.card-filter-options label{min-width:0}.card-filter-options select,.card-filter-toggle{width:100%}.card-filter-head{align-items:flex-start;flex-direction:column;gap:4px}}
 </style></head>
-<body>
+<style>
+/* Page-based catalogue navigation */
+html{scroll-behavior:auto}.page-section{display:none}.page-section.is-active{display:block}.page-home.is-active{display:block}.page-home .hero{padding:clamp(38px,7vw,86px) 0 40px}.page-home .hero-grid{grid-template-columns:1fr .62fr;gap:28px}.page-home h1{max-width:760px;font-size:clamp(3.5rem,8.4vw,7.5rem);line-height:.84;text-transform:uppercase}.page-home .hero-copy{max-width:490px;margin-top:18px;font-size:1rem}.page-home .crest-wrap{min-height:380px}.page-home .hero-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));max-width:700px}.page-home .hero-actions a{min-height:58px;text-align:center}.page-home .hero-note{display:none}.page-home .trust-strip{margin-top:12px}.page-home .trust-item{padding:16px 12px}.page-home .trust-item strong{font-size:.98rem}.view-back{display:inline-flex;align-items:center;gap:8px;margin-bottom:20px;border:0;padding:0;color:var(--blue);background:transparent;font-weight:900}.section-head{margin-bottom:24px}.section-head h2{font-size:clamp(2.5rem,5vw,4.4rem)}.section-head>p{display:none}.catalog,.breaks,.community,.about{padding-top:42px}.community-card{min-height:300px}.community-copy h2{max-width:610px}.about{max-width:960px}.nav-links a[aria-current=page]{color:var(--gold2)}
+@media(max-width:930px){.page-home .hero-grid{grid-template-columns:1fr}.page-home .crest-wrap{display:none}}
+@media(max-width:650px){.page-home .hero{padding:35px 0 25px}.page-home h1{font-size:clamp(3.7rem,18vw,5.4rem)}.page-home .hero-copy{margin-top:14px;font-size:.94rem}.page-home .hero-actions{grid-template-columns:1fr;gap:9px;margin-top:22px}.page-home .hero-actions a{min-height:54px}.page-home .trust-grid{display:none}.catalog,.breaks,.community,.about{padding-top:30px}.community-card{min-height:calc(100dvh - 180px);align-content:center}.community-copy p{font-size:1rem}.breaks{min-height:calc(100dvh - 68px)}.section-head h2{font-size:2.75rem}}
+</style>
+<style>
+/* Navegación por vistas: evita que el catálogo se perciba como un folleto largo. */
+body.view-home #catalogo,body.view-home #breaks,body.view-home #comunidad,body.view-home #nosotros{display:none!important}
+body.view-catalog #inicio,body.view-catalog .trust-strip,body.view-catalog #home-promo,body.view-catalog #breaks,body.view-catalog #comunidad,body.view-catalog #nosotros{display:none!important}
+body.view-breaks #inicio,body.view-breaks .trust-strip,body.view-breaks #home-promo,body.view-breaks #catalogo,body.view-breaks #comunidad,body.view-breaks #nosotros{display:none!important}
+body.view-community #inicio,body.view-community .trust-strip,body.view-community #home-promo,body.view-community #catalogo,body.view-community #breaks,body.view-community #nosotros{display:none!important}
+body.view-about #inicio,body.view-about .trust-strip,body.view-about #home-promo,body.view-about #catalogo,body.view-about #breaks,body.view-about #comunidad{display:none!important}
+body.view-about{min-height:100dvh;display:flex;flex-direction:column}body.view-about main.page-home{flex:1;display:flex;flex-direction:column}body.view-about .about{flex:1;display:grid;align-content:center}
+.eyebrow{display:none!important}
+body.view-home .hero{padding:28px 0 18px}body.view-home h1{max-width:590px;font-size:clamp(2.65rem,4.6vw,4.75rem);line-height:.9;text-transform:none}body.view-home .crest-wrap{min-height:310px}body.view-home .crest{width:min(340px,68vw)}body.view-home h1{text-transform:none}body.view-home .slogan{margin:12px 0 0;font-size:1.1rem;color:var(--gold2);font-weight:900;letter-spacing:.06em;text-transform:uppercase}
+body.view-home .hero-copy{max-width:420px;margin-top:14px;font-size:1.04rem;font-weight:700}
+body.view-home{min-height:100dvh;display:flex;flex-direction:column}body.view-home main.page-home{flex:1}body.view-home .trust-strip{display:none}.home-promo{padding:0 0 42px}.home-promo-custom{display:grid;justify-items:center;gap:14px}.promo-visual{display:grid;justify-items:center;gap:14px;width:100%}.home-promo-custom img{display:block;width:100%;max-height:480px;object-fit:contain}.promo-side-products{display:none}.home-promo-custom.has-side-products{grid-template-columns:minmax(170px,1fr) minmax(280px,480px) minmax(170px,1fr);align-items:center;gap:24px}.home-promo-custom.has-side-products .promo-side-products{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;width:100%}.promo-side-product{overflow:hidden;border:1px solid var(--line);border-radius:14px;background:#fff;box-shadow:0 9px 20px rgba(9,45,82,.1)}.promo-side-product img{width:100%;height:165px;object-fit:cover}.promo-side-product div{padding:9px}.promo-side-product strong,.promo-side-product span{display:block}.promo-side-product strong{color:var(--navy);font-size:.74rem;line-height:1.2}.promo-side-product span{margin-top:5px;color:var(--blue);font-size:.78rem;font-weight:900}.promo-info{min-height:48px;padding:0 24px;border-radius:999px;color:var(--navy);background:linear-gradient(135deg,#f8d778,var(--gold2));box-shadow:0 9px 22px rgba(217,155,43,.22);display:inline-flex;align-items:center;justify-content:center;font-weight:800;text-decoration:none}.home-promo-products{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.home-promo-product{overflow:hidden;border:1px solid var(--line);border-radius:16px;background:#fff;box-shadow:0 9px 20px rgba(9,45,82,.08)}.home-promo-product img{display:block;width:100%;aspect-ratio:1;object-fit:cover}.home-promo-product div{padding:11px}.home-promo-product strong,.home-promo-product span{display:block}.home-promo-product strong{font-size:.82rem;line-height:1.25;color:var(--navy)}.home-promo-product span{margin-top:6px;color:var(--blue);font-size:.84rem;font-weight:900}
+ .home-promo-default{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(260px,.72fr);align-items:center;gap:clamp(28px,5vw,76px)}.home-promo-default .home-promo-products{grid-template-columns:repeat(4,minmax(0,1fr))}.home-promo-default .home-promo-product{display:flex;flex-direction:column}.home-promo-default .home-promo-product>div{flex:1;display:flex;flex-direction:column}.home-promo-product-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:auto;padding-top:9px}.home-promo-product-actions .direct,.home-promo-product-actions .add{min-height:34px;padding:5px;font-size:.68rem}
+.home-promo-custom{grid-template-columns:minmax(260px,1fr) minmax(260px,.72fr);align-items:center;gap:clamp(28px,5vw,76px)}.home-promo-note{position:relative;padding:34px 32px 31px;transform:rotate(1.2deg);border:1px solid #d7c38d;background:linear-gradient(135deg,#fffdf4,#f7edcc);box-shadow:9px 12px 0 rgba(9,45,82,.12),0 14px 25px rgba(9,45,82,.13);color:#263f56}.home-promo-note:before{content:"✦";position:absolute;top:10px;right:16px;color:var(--gold);font-size:1.45rem}.home-promo-note h2{margin:0 0 16px;color:var(--navy);font:2rem Georgia,serif}.home-promo-note p{margin:0;color:#35526b;font:1.05rem/1.7 Georgia,serif}.home-promo-note .promo-info{margin-top:22px}.mobile-title-break{display:none}@media(max-width:650px){.mobile-title-break{display:inline}body.view-home .hero{padding:25px 0 18px}body.view-home h1{width:100%;max-width:none;text-align:center;font-size:clamp(2.55rem,12vw,3.35rem);line-height:.91;letter-spacing:-.055em;text-transform:none}body.view-home .hero-copy{display:none}body.view-home .slogan{max-width:100%;text-align:center;font-size:.88rem;line-height:1.2;margin-top:12px}body.view-home .hero-actions{margin-top:18px}body.view-home .hero-actions a{min-height:50px;padding-inline:15px}.home-promo{padding:2px 0 24px}.home-promo-custom{grid-template-columns:1fr;gap:14px}.home-promo-note{display:none}.home-promo-custom img{max-height:360px}.home-promo-products{grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}.home-promo-product div{padding:8px}.home-promo-product strong{font-size:.7rem}.home-promo-product span{font-size:.72rem}body.view-home footer{padding:22px 0 18px}body.view-home .footer-brand img{width:42px;height:42px}body.view-home .footer-bottom{margin-top:16px;padding-top:14px}.footer-contact{margin-top:12px}}
+@media(max-width:650px){.home-promo-default{grid-template-columns:1fr}.home-promo-default .home-promo-products{grid-template-columns:repeat(3,minmax(0,1fr))}.home-promo-product-actions{grid-template-columns:1fr}.home-promo-product-actions .direct,.home-promo-product-actions .add{width:100%;font-size:.66rem}}
+</style>
+<body class="view-home">
+<script>
+document.addEventListener('DOMContentLoaded',function(){
+  const pageForHash={inicio:'home',catalogo:'catalog',breaks:'breaks',nosotros:'about'};
+  const viewClasses=Object.values(pageForHash).map(function(page){return 'view-'+page});
+  function showPage(page){
+    document.body.classList.remove.apply(document.body.classList,viewClasses);
+    document.body.classList.add('view-'+page);
+    document.querySelectorAll('.nav-links a[href^="#"]').forEach(function(link){
+      link.setAttribute('aria-current',pageForHash[link.getAttribute('href').slice(1)]===page?'page':'false');
+    });
+    window.scrollTo({top:0,behavior:'auto'});
+  }
+  function openCurrentPage(){showPage(pageForHash[location.hash.slice(1)]||'home')}
+  document.querySelectorAll('a[href^="#"]').forEach(function(link){
+    const hash=link.getAttribute('href').slice(1);
+    if(!pageForHash[hash])return;
+    link.addEventListener('click',function(event){
+      event.preventDefault();
+      history.replaceState(null,'','#'+hash);
+      showPage(pageForHash[hash]);
+    });
+  });
+  window.addEventListener('hashchange',openCurrentPage);
+  const heroTitle=document.querySelector('#inicio h1');
+  if(heroTitle)heroTitle.innerHTML='El fútbol también<span class="mobile-title-break"><br></span> <em>se colecciona.</em>';
+  const heroCopy=document.querySelector('#inicio .hero-copy');
+  if(heroCopy)heroCopy.textContent='Producto sellado, cajas seleccionadas, tarjetas y experiencias de break para quienes disfrutan cada apertura.';
+  const slogan=document.querySelector('#inicio .slogan');
+  if(slogan)slogan.textContent='Sky Collections, donde coleccionas estrellas.';
+  const actions=document.querySelector('#inicio .hero-actions');
+  const communityLink='https://chat.whatsapp.com/CqWAnbw7UMdLA7yqalUZAM';
+  const communityNav=document.querySelector('.nav-links a[href="#comunidad"]');
+  if(communityNav)communityNav.remove();
+  const communityButton=actions?.querySelector('a[href="#comunidad"]');
+  if(communityButton){communityButton.href=communityLink;communityButton.target='_blank';communityButton.rel='noreferrer';communityButton.replaceWith(communityButton.cloneNode(true))}
+  if(actions&&!actions.querySelector('[href="#breaks"]'))actions.insertAdjacentHTML('beforeend','<a class="secondary" href="#breaks">Ver breaks</a>');
+  const aboutNav=document.querySelector('.nav-links a[href="#nosotros"]');
+  if(aboutNav)aboutNav.textContent='Cómo comprar';
+  const aboutTitle=document.querySelector('#nosotros h2');
+  if(aboutTitle)aboutTitle.textContent='Cómo comprar';
+  let currentPromotion=null;
+  function renderHomePromotion(){
+    let section=document.querySelector('#home-promo');
+    if(!section){document.querySelector('.trust-strip')?.insertAdjacentHTML('afterend','<section class="home-promo shell" id="home-promo"></section>');section=document.querySelector('#home-promo')}
+    if(!section)return;
+    if(currentPromotion?.image){
+      const title=String(currentPromotion.noteTitle||'Quiénes somos').replace(/</g,'&lt;');
+      const message=String(currentPromotion.noteMessage||'Somos una pareja que quiso hacer realidad el sueño de compartir el coleccionismo con todos los apasionados. Por eso fundamos Sky Collections. Estamos muy agradecidos por el apoyo y la confianza que nos dan con cada compra; por eso tratamos de traerles siempre las mejores actividades y los mejores productos. Hacemos lives seguido por nuestro canal de TikTok, donde podemos emocionarnos juntos con cada apertura.').replace(/</g,'&lt;');
+      section.innerHTML='<article class="home-promo-custom"><div class="promo-visual"><img src="'+currentPromotion.image+'" alt="Promoción Sky Collections"><a class="promo-info" href="'+whatsappUrl('Hola, Sky Collections. Quiero recibir información sobre la promoción actual. ¿Me cuentas más?')+'" target="_blank" rel="noreferrer">Pedir información</a></div><aside class="home-promo-note"><h2>'+title+'</h2><p>'+message+'</p></aside></article>';
+      return
+    }
+    const featured=(products||[]).filter(function(product){return product.stock>0&&!product.reservation}).sort(function(a,b){return b.price-a.price}).slice(0,matchMedia('(max-width:650px)').matches?3:4);
+    const title='Quiénes somos',message='Somos una pareja que quiso hacer realidad el sueño de compartir el coleccionismo con todos los apasionados. Por eso fundamos Sky Collections. Estamos muy agradecidos por el apoyo y la confianza que nos dan con cada compra; por eso tratamos de traerles siempre las mejores actividades y los mejores productos. Hacemos lives seguido por nuestro canal de TikTok, donde podemos emocionarnos juntos con cada apertura.';
+    section.innerHTML='<div class="home-promo-default">'+(featured.length?'<div class="home-promo-products">'+featured.map(function(product){return '<article class="home-promo-product"><img src="'+product.image+'" alt="'+(product.player||product.name)+'" loading="lazy"><div><strong>'+ (product.player||product.name) +'</strong><span>'+money.format(product.price)+'</span><div class="home-promo-product-actions"><a class="direct" href="'+order(product)+'" target="_blank" rel="noreferrer">Comprar</a><button class="add" data-home-add="'+product.name+'">Agregar</button></div></div></article>'}).join('')+'</div>':'')+'<aside class="home-promo-note"><h2>'+title+'</h2><p>'+message+'</p></aside></div>';
+    section.querySelectorAll('[data-home-add]').forEach(function(button){button.onclick=function(){add(button.dataset.homeAdd)}});
+  }
+  window.addEventListener('message',function(event){if(event.origin!==location.origin||event.data?.type!=="sky-catalog-update")return;currentPromotion=event.data.snapshot?.promotion||null;setTimeout(function(){renderHomePromotion();const active=(breaks||[]).filter(function(item){return item.status!=="past"}),past=(breaks||[]).filter(function(item){return item.status==="past"});if(!active.length&&past.length)document.querySelector('#past-breaks').open=true},0)});
+  window.addEventListener('resize',renderHomePromotion);
+  setTimeout(renderHomePromotion,0);
+  setTimeout(function(){const active=(breaks||[]).filter(function(item){return item.status!=="past"}),past=(breaks||[]).filter(function(item){return item.status==="past"});if(!active.length&&past.length)document.querySelector('#past-breaks').open=true},0);
+  openCurrentPage();
+});
+</script>
 <header class="site-header"><nav class="nav shell" aria-label="Navegación principal"><a class="brand" href="#inicio"><img src="assets/logo.jpeg" alt="Logo de Sky Collections"><span>SKY COLLECTIONS</span></a><div class="nav-links" id="main-nav-links"><div class="menu-panel-head"><strong>Explorar Sky Collections</strong><button class="menu-close" id="menu-close" type="button" aria-label="Cerrar menú">×</button></div><a href="#inicio">Inicio</a><a href="#catalogo">Catálogo</a><a href="#breaks">Breaks</a><a href="#comunidad">Comunidad</a><a href="#nosotros">Cómo comprar</a></div><div class="nav-actions"><button class="cart-button" id="open-cart" type="button" aria-label="Abrir carrito"><span>🛒</span><span class="cart-label">Carrito</span><span class="cart-count" id="cart-count">0</span></button><button class="menu-toggle" id="menu-toggle" type="button" aria-expanded="false" aria-controls="main-nav-links" aria-label="Abrir menú"><span></span><span></span><span></span></button></div></nav></header><div class="menu-overlay" id="menu-overlay"></div>
-<main>
+<main class="page-home">
 <section class="hero" id="inicio"><div class="hero-grid shell"><div><p class="eyebrow">Tarjetas deportivas · Colombia</p><h1>El fútbol también se <em>colecciona.</em></h1><p class="slogan">Sky Collections, donde coleccionas estrellas.</p><p class="hero-copy">Producto sellado, cajas seleccionadas, tarjetas y experiencias de break para quienes disfrutan cada apertura.</p><div class="hero-actions"><a class="primary" href="#catalogo">Ver catálogo</a><a class="secondary" href="#comunidad">Unirme a la comunidad</a></div><p class="hero-note">Precios en pesos colombianos · Stock actualizado según inventario</p></div><div class="crest-wrap" aria-hidden="true"><span class="star star1">✦</span><span class="star star2">☾</span><img class="crest" src="assets/logo.jpeg" alt=""></div></div></section>
 <div class="trust-strip"><div class="trust-grid shell"><div class="trust-item"><strong>Producto sellado</strong>Cajas y sobres originales</div><div class="trust-item"><strong>Compra a tu manera</strong>Directa o con carrito por WhatsApp</div><div class="trust-item"><strong>Breaks para coleccionar</strong>Diferentes formatos y dinámicas</div></div></div>
 <section class="community shell" id="comunidad"><div class="community-card"><div class="community-copy"><p class="eyebrow">La comunidad Sky</p><h2>Comparte la emoción de cada apertura.</h2><p>Únete a nuestra comunidad de WhatsApp para enterarte de próximos breaks, nuevas colecciones, cupos y novedades.</p></div><a class="community-button" href="https://chat.whatsapp.com/CqWAnbw7UMdLA7yqalUZAM" target="_blank" rel="noreferrer">Unirme a la comunidad</a></div></section>

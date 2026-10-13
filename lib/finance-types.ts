@@ -61,6 +61,7 @@ export type Expense = {
   paymentAccount: PaymentAccount;
   category: "mercancia" | "tarjetas" | "envio" | "publicidad" | "otro";
   note?: string;
+  createdAt?: string;
 };
 
 export type Shipment = {
@@ -72,6 +73,7 @@ export type Shipment = {
   cost: number;
   paymentAccount?: PaymentAccount;
   note?: string;
+  createdAt?: string;
 };
 
 export type IncomingOrder = {
@@ -92,6 +94,7 @@ export type DebtPayment = {
   amount: number;
   paymentAccount: PaymentAccount;
   note?: string;
+  createdAt?: string;
 };
 
 export type FinancialBaseline = {

@@ -1,4 +1,4 @@
-export type PaymentAccount = "nequi" | "cash" | "debt";
+export type PaymentAccount = "nequi" | "cash" | "bold" | "debt";
 
 export type Customer = {
   id: string;
@@ -101,6 +101,7 @@ export type FinancialBaseline = {
   cutoverDate: string;
   nequi: number;
   cash: number;
+  bold?: number;
   debt: number;
 };
 

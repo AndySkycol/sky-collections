@@ -16,6 +16,8 @@ export type Product = {
   reservation?: {
     customerName: string;
     reservedAt: string;
+    /** Inventory was already reduced, but the financial sale is still pending. */
+    saleConfirmedAt?: string;
   };
 };
 

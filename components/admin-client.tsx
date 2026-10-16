@@ -41,7 +41,7 @@ const historicalWeeks = [
 function defaultFinance(): FinanceData {
   return {
     version: 3,
-    baseline: { cutoverDate: "2026-10-05", nequi: 1852213, cash: 156000, debt: 2356037 },
+    baseline: { cutoverDate: "2026-10-05", nequi: 1852213, cash: 156000, bold: 0, debt: 2356037 },
     historicalMonths: [
       { month: "2026-08", sales: 1918000, expenses: 4490487 },
       { month: "2026-09", sales: 5524601, expenses: 5919694 },
@@ -55,10 +55,13 @@ function defaultFinance(): FinanceData {
 
 function hydrateSnapshot(snapshot: CatalogSnapshot): CatalogSnapshot {
   const metadata = window.SKY_CARD_METADATA ?? {};
-  const finance = !snapshot.finance ? defaultFinance() : snapshot.finance.version === 3 ? snapshot.finance : {
+  const finance = !snapshot.finance ? defaultFinance() : snapshot.finance.version === 3 ? {
+    ...snapshot.finance,
+    baseline: { ...snapshot.finance.baseline, bold: snapshot.finance.baseline.bold ?? 0 },
+  } : {
     ...snapshot.finance,
     version: 3,
-    baseline: { ...snapshot.finance.baseline, nequi: snapshot.finance.baseline.nequi === 2797037 ? 1852213 : snapshot.finance.baseline.nequi },
+    baseline: { ...snapshot.finance.baseline, bold: snapshot.finance.baseline.bold ?? 0, nequi: snapshot.finance.baseline.nequi === 2797037 ? 1852213 : snapshot.finance.baseline.nequi },
     historicalMonths: snapshot.finance.historicalMonths.map((item) => item.month === "2026-10" && item.expenses === 317189 ? { ...item, expenses: 1262013 } : item),
     historicalWeeks: snapshot.finance.historicalWeeks?.length ? snapshot.finance.historicalWeeks : historicalWeeks,
   };
@@ -355,9 +358,21 @@ export function AdminClient({ email, displayName, signOutPath }: Props) {
     const product = data.products[index];
     if (!confirm(`¿Devolver ${product.name} al catálogo disponible?`)) return;
     const products = clone(data.products);
+    if (products[index].reservation?.saleConfirmedAt) products[index].stock += 1;
     delete products[index].reservation;
     changeData({ ...data, products });
     setMessage("Producto devuelto al catálogo. Publica los cambios cuando quieras mostrarlo de nuevo a los clientes.");
+  }
+
+  function confirmReservedSale(index: number) {
+    const product = data.products[index];
+    if (!product.reservation || product.reservation.saleConfirmedAt) return;
+    if (!confirm(`¿Confirmar que ${product.name} ya se vendió? Se descontará una unidad del inventario, pero todavía no se registrará la venta en Finanzas.`)) return;
+    const products = clone(data.products);
+    products[index].stock = Math.max(0, Number(products[index].stock || 0) - 1);
+    products[index].reservation!.saleConfirmedAt = new Date().toISOString();
+    changeData({ ...data, products });
+    setMessage("Venta confirmada e inventario actualizado. Puedes registrar el movimiento después desde Finanzas.");
   }
 
   function sellReserved(index: number) {
@@ -422,7 +437,7 @@ export function AdminClient({ email, displayName, signOutPath }: Props) {
           <section className="admin-panel">
             <div className="admin-panel-head"><div><h1>Productos reservados</h1><p>Estos productos no se muestran en el catálogo de clientes.</p></div></div>
             <div className="admin-reserved-list">
-              {reservedProducts.map(({ product, index }) => <article key={`${product.name}-${index}`}><img className="admin-thumb" src={product.image} alt="" /><div><strong>{product.name}</strong><small>{product.detail || product.category} · {money.format(Number(product.price) || 0)}</small><p>Reservado por <strong>{product.reservation!.customerName}</strong> · hace {reservationDuration(product.reservation!.reservedAt)}</p></div><div className="admin-row-actions"><button className="admin-button primary" onClick={() => sellReserved(index)}>Registrar venta</button><button className="admin-button" onClick={() => releaseReservation(index)}>Volver al catálogo</button></div></article>)}
+              {reservedProducts.map(({ product, index }) => <article key={`${product.name}-${index}`}><img className="admin-thumb" src={product.image} alt="" /><div><strong>{product.name}</strong><small>{product.detail || product.category} · {money.format(Number(product.price) || 0)}</small><p>{product.reservation!.saleConfirmedAt ? <>Venta confirmada para <strong>{product.reservation!.customerName}</strong> · pendiente de registrar en Finanzas</> : <>Reservado por <strong>{product.reservation!.customerName}</strong> · hace {reservationDuration(product.reservation!.reservedAt)}</>}</p></div><div className="admin-row-actions"><button className="admin-button primary" onClick={() => sellReserved(index)}>{product.reservation!.saleConfirmedAt ? "Registrar venta ahora" : "Registrar venta"}</button>{!product.reservation!.saleConfirmedAt && <button className="admin-button blue" onClick={() => confirmReservedSale(index)}>Confirmar vendida sin registrar</button>}<button className="admin-button" onClick={() => releaseReservation(index)}>{product.reservation!.saleConfirmedAt ? "Cancelar y devolver" : "Volver al catálogo"}</button></div></article>)}
               {!reservedProducts.length && <div className="admin-empty">No hay productos reservados.</div>}
             </div>
           </section>
